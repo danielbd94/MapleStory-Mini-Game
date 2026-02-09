@@ -1,0 +1,39 @@
+{
+  "quests": [
+    {
+      "id": "q1",
+      "title": "Quest 1",
+      "description": "Kill 5 Snails",
+      "requirements": [
+        {
+          "type": "kill",
+          "mobId": 100100,
+          "count": 5
+        }
+      ],
+      "rewards": {
+        "exp": 0
+      },
+      "unlocks": [
+        "q2"
+      ]
+    },
+    {
+      "id": "q2",
+      "title": "Quest 2",
+      "description": "Kill 3 Blue Snails",
+      "requirements": [
+        {
+          "type": "kill",
+          "mobId": 100101,
+          "count": 3
+        }
+      ],
+      "rewards": {
+        "exp": 0
+      },
+      "unlocks": []
+    }
+  ],
+  "startQuestId": "q1"
+}
