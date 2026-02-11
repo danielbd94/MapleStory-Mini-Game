@@ -2,6 +2,29 @@ const canvas = document.getElementById("c");
 const ctx = canvas.getContext("2d");
 ctx.imageSmoothingEnabled = false;
 
+// Original design size for scaling calculations
+const ORIGINAL_WIDTH = 960;
+const ORIGINAL_HEIGHT = 540;
+
+let scaleX = 1;
+let scaleY = 1;
+
+// Set canvas to fullscreen and responsive
+function resizeCanvas() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  
+  scaleX = canvas.width / ORIGINAL_WIDTH;
+  scaleY = canvas.height / ORIGINAL_HEIGHT;
+}
+resizeCanvas();
+window.addEventListener("resize", resizeCanvas);
+
+function updateResponsiveValues() {
+  // Keep game logic in original 960x540 space
+  // Only scale at render time for visual display
+}
+
 const UI = {
   questTitle: document.getElementById("questTitle"),
   questDesc: document.getElementById("questDesc"),
@@ -148,13 +171,14 @@ function addError(msg) {
   UI.errors.textContent = (UI.errors.textContent ? UI.errors.textContent + "\n" : "") + msg;
 }
 
-// ===== WORLD (3 platforms) =====
+// ===== WORLD (3 platforms) in original 960x540 space =====
+// ===== WORLD (3 platforms) in original 960x540 space =====
 const WORLD = {
   platforms: [
     // ground (כמו שהיה)
-    { x: 0, y: CONFIG.groundY, w: canvas.width, h: canvas.height - CONFIG.groundY },
+    { x: 0, y: 465, w: 960, h: 540 - 465 },
 
-    // 3 main long platforms (תתחיל איתם)
+    // 3 main long platforms
     { x: 238, y: 215, w: 485, h: 18 }, // top long
     { x: 199, y: 293, w: 560, h: 18 }, // mid long
     { x: 160, y:370, w: 638, h: 18 }, // bottom long
@@ -656,7 +680,7 @@ function updatePlayer(dt) {
   // ===== PLATFORM COLLISION (swept feet test) =====
   for (const p of WORLD.platforms.slice(1)) {
     const pbNow = playerBox();
-    const isFalling = player.vy >= 0;
+    const isFalling = player.vy > 0;
 
     const withinX =
       (pbNow.x + pbNow.w) > p.x &&
@@ -665,11 +689,25 @@ function updatePlayer(dt) {
     const prevFeet = prevPB.y + prevPB.h;
     const nowFeet  = pbNow.y + pbNow.h;
 
-    // עברנו את קו הפלטפורמה מלמעלה למטה
+    // Crossed platform line from above going down
     const crossedTop = (prevFeet <= p.y) && (nowFeet >= p.y);
+    
+    // Check if feet are touching platform surface
+    const feetOnPlatform = withinX && (nowFeet >= p.y && nowFeet <= p.y + 5);
 
     if (withinX && isFalling && crossedTop) {
+      // Landing on platform from above
       player.y = (p.y - pbNow.h) - PLAYER_HITBOX.offsetY + PLAYER_HITBOX.footPad;
+      player.vy = 0;
+      player.onGround = true;
+      break;
+    }
+    
+    // Keep player on platform if feet are touching it and not jumping up
+    if (feetOnPlatform && player.vy >= -10) { // allow small upward velocity tolerance
+      // Snap player to platform surface
+      const pbAdjusted = playerBoxAt(player.x, player.y);
+      player.y = (p.y - pbAdjusted.h) - PLAYER_HITBOX.offsetY + PLAYER_HITBOX.footPad;
       player.vy = 0;
       player.onGround = true;
       break;
@@ -706,14 +744,16 @@ function updateMobs(dt) {
     const dx = m.dir * m.speed * dt;
     m.x += dx;
 
-
-    // platform bounds
-    const p = m.platform || { x: 0, y: CONFIG.groundY, w: canvas.width, h: 9999 };
+    // platform bounds with safety margin
+    const p = m.platform || { x: 0, y: CONFIG.groundY, w: ORIGINAL_WIDTH, h: 9999 };
     const minX = p.x;
     const maxX = p.x + p.w - m.w;
 
-    if (m.x <= minX) { m.x = minX; m.dir = 1; }
-    if (m.x >= maxX) { m.x = maxX; m.dir = -1; }
+    // Keep mob within platform bounds
+    if (m.x < minX) { m.x = minX; m.dir = 1; }
+    if (m.x > maxX) { m.x = maxX; m.dir = -1; }
+    // Clamp just to be safe
+    m.x = Math.max(minX, Math.min(m.x, maxX));
 
     // keep y glued to platform top
     m.y = mobYOnPlatform(p, m.h);
@@ -777,22 +817,9 @@ function render() {
   // DEBUG: show platforms
   ctx.fillStyle = "rgba(255,0,0,0.35)";
   for (const p of WORLD.platforms) {
-    ctx.fillRect(p.x, p.y, p.w, p.h);
+    ctx.fillRect(p.x * scaleX, p.y * scaleY, p.w * scaleX, p.h * scaleY);
   }
   */
-// DEBUG hitbox
-const pb = playerBox();
-ctx.save();
-ctx.strokeStyle = "lime";
-ctx.strokeRect(pb.x, pb.y, pb.w, pb.h);
-
-// feet line
-ctx.strokeStyle = "yellow";
-ctx.beginPath();
-ctx.moveTo(pb.x, pb.y + pb.h);
-ctx.lineTo(pb.x + pb.w, pb.y + pb.h);
-ctx.stroke();
-ctx.restore();
 
   // ===== PLAYER DRAW (image) =====
   // choose anim (attack priority)
@@ -803,49 +830,51 @@ ctx.restore();
 
   const pImg = getPlayerFrame(anim, t);
 
-    // align draw to hitbox feet (prevents "floating" visuals)
+  // align draw to hitbox feet (prevents "floating" visuals)
   const pbox = playerBox();
   const feetY = pbox.y + pbox.h;
   const drawY = feetY - player.h;
 
-  
+  const sx = player.x * scaleX;
+  const sy = drawY * scaleY;
+  const sw = player.w * scaleX;
+  const sh = player.h * scaleY;
 
   if (pImg) {
-    if (player.facing === 1) ctx.drawImage(pImg, player.x, drawY, player.w, player.h);
-    else drawFlipped(pImg, player.x, drawY, player.w, player.h);
+    if (player.facing === -1) ctx.drawImage(pImg, sx, sy, sw, sh);
+    else drawFlipped(pImg, sx, sy, sw, sh);
   } else {
     ctx.fillStyle = "magenta";
-    ctx.fillRect(player.x, drawY, player.w, player.h);
+    ctx.fillRect(sx, sy, sw, sh);
   }
 
-
   // player HP bar (above head)
-  const px = player.x;
-  const py = player.y - 12;
-  const pw = player.w;
-  const ph = 6;
-
   ctx.fillStyle = "rgba(255,255,255,0.25)";
-  ctx.fillRect(px, py, pw, ph);
+  ctx.fillRect(player.x * scaleX, (player.y - 12) * scaleY, player.w * scaleX, 6 * scaleY);
   ctx.fillStyle = "rgba(0,255,0,0.7)";
-  ctx.fillRect(px, py, pw * (player.hp / Math.max(1, player.maxHP)), ph);
+  ctx.fillRect(player.x * scaleX, (player.y - 12) * scaleY, (player.w * (player.hp / Math.max(1, player.maxHP))) * scaleX, 6 * scaleY);
 
   // ===== MOBS DRAW =====
   for (const m of mobs) {
     const img = getMobFrame(m.id, m.state, t);
+    const mx = m.x * scaleX;
+    const my = m.y * scaleY;
+    const mw = m.w * scaleX;
+    const mh = m.h * scaleY;
+
     if (img) {
-      if (m.dir === 1) drawFlipped(img, m.x, m.y, m.w, m.h);
-      else ctx.drawImage(img, m.x, m.y, m.w, m.h);
+      if (m.dir === 1) drawFlipped(img, mx, my, mw, mh);
+      else ctx.drawImage(img, mx, my, mw, mh);
     } else {
       ctx.fillStyle = "#ff6";
-      ctx.fillRect(m.x, m.y, m.w, m.h);
+      ctx.fillRect(mx, my, mw, mh);
     }
 
     // mob hp bar
     ctx.fillStyle = "rgba(255,255,255,0.25)";
-    ctx.fillRect(m.x, m.y - 10, m.w, 6);
-    ctx.fillStyle = "rgba(0,255,0,0.7)";
-    ctx.fillRect(m.x, m.y - 10, m.w * (m.hp / m.maxHP), 6);
+    ctx.fillRect(mx, (m.y - 10) * scaleY, mw, 6 * scaleY);
+    ctx.fillStyle = "rgba(255,0,0,0.7)";
+    ctx.fillRect(mx, (m.y - 10) * scaleY, mw * (m.hp / m.maxHP), 6 * scaleY);
   }
 
   renderQuestUI();
@@ -886,8 +915,10 @@ async function boot() {
   questsDb = await fetchJson(PATHS.quests);
   initQuestState();
 
-  // place player on ground
-  player.y = CONFIG.groundY - player.h;
+  // place player on third platform (not flying)
+  // Feet should be at platform.y, so: player.y + offsetY + hitbox.h = platform.y
+  const thirdPlatform = WORLD.platforms[3];
+  player.y = thirdPlatform.y - PLAYER_HITBOX.offsetY - PLAYER_HITBOX.h;
   player.vy = 0;
   player.onGround = true;
 
@@ -908,14 +939,16 @@ async function boot() {
   stand: playerFrames.get("stand")?.length ?? 0,
   walk: playerFrames.get("walk")?.length ?? 0,
   jump: playerFrames.get("jump")?.length ?? 0,
-  attack: playerFrames.get("attack")?.length ?? 0,
+  attack1: playerFrames.get("attack1")?.length ?? 0,
+  attack2: playerFrames.get("attack2")?.length ?? 0,
+  attackF: playerFrames.get("attackF")?.length ?? 0,
   climbRope: playerFrames.get("climbRope")?.length ?? 0,
   climbLadder: playerFrames.get("climbLadder")?.length ?? 0,
 });
 
 
   // OPTIONAL DEBUG: show if something failed to load
-  for (const k of ["stand", "walk", "jump", "attack", "climbRope", "climbLadder"]) {
+  for (const k of ["stand", "walk", "jump", "attack1", "attack2", "attackF", "climbRope", "climbLadder"]) {
     const n = playerFrames.get(k)?.length ?? 0;
     if (!n) addError(`PLAYER FRAMES MISSING: ${k}`);
   }
