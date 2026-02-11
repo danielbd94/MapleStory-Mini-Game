@@ -45,7 +45,3 @@ Because this repo does not include a published release, the simplest way to run 
 Created by:
 - Daniel Ben David (GitHub: `danielbd94`)
 - Mor Avnaim (GitHub: `MorAvnaim`)
-
-## License
-
-No license file is currently included in the repository. If you intend others to reuse the code, add a LICENSE file (for example MIT) and update this section.
