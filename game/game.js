@@ -11,11 +11,15 @@ const UI = {
 };
 
 const CONFIG = {
-  groundY: 460,
+  groundY: 465,
 
   playerSpeed: 240,
   playerDamage: 2,
   attackCooldownMs: 220,
+
+  // NEW: physics
+  gravity: 1600,
+  jumpVel: 620,
 
   spawnMaxOnScreen: 6,
   spawnIntervalMs: 900,
@@ -27,17 +31,99 @@ const CONFIG = {
   fps: 10,
   hitStateMs: 250,
   dieStateMs: 900,
-};
 
-const PATHS = {
+  playerMaxHP: 30,
+  touchDamageCooldownMs: 500,
+};
+const PLAYER_HITBOX = {
+  // כמה להוריד/להצר את הקוליז'ן ביחס לתמונה
+  offsetX: 16,
+  offsetY: 10,
+  w: 22,
+  h: 58,
+
+  // נקודת "הרגליים" (לדיוק נחיתה)
+  footPad: 2,
+};
+const PLAYER_DRAW_OFFSET_Y = 18; // כוונון גובה ויזואלי בלבד
+
+  const PATHS = {
   statsPrimary: `./assets/data/mobs_stats.json`,
-  statsFallback: `../stats/mobs_stats.json`,
+  statsFallback: `./assets/data/mobs_stats.json`,
   quests: `./data/quests.json`,
+  mapBg: `./assets/maps/farm.png`,
+
   frame: (mobId, anim, frameIndex) => {
     const f = String(frameIndex).padStart(3, "0");
     return `./assets/mobs/${mobId}/${anim}/${f}.png`;
   },
 };
+
+
+
+// לפי המבנה שלך: folder + prefix + "." + index + ".png"
+const PLAYER_ANIMS = {
+  stand:      { folder: "stand",       prefix: "stand2" },
+  walk:       { folder: "walk",        prefix: "walk2" },
+  jump: { folder: "jump", prefix: "jump" },
+  climbRope:  { folder: "climbRope",   prefix: "rope0" },
+  climbLadder:{ folder: "climbLadder", prefix: "ladder0" },
+
+  // התקפה: יש לך stabT1, stabT2... נתחיל עם T1
+  attack1: { folder: "attack", prefix: "stabT1" },
+  attack2: { folder: "attack", prefix: "stabT2" },
+  attackF: { folder: "attack", prefix: "stabTF" },
+
+};
+const PLAYER_FRAME_COUNTS = {
+  stand: 3,        // stand2.0 – stand2.2
+  walk: 4,         // walk2.0 – walk2.3
+  jump: 1,         // jump0.0
+  climbRope: 2,    // rope0.0 – rope0.1
+  climbLadder: 2,  // ladder0.0 – ladder0.1
+  attack1: 3,
+  attack2: 3,
+  attackF: 4,
+       // stabT1.0 – stabT1.3 (אם יש יותר תגיד לי)
+};
+
+const PLAYER_PATHS = {
+  frame: (animKey, i) => {
+    const a = PLAYER_ANIMS[animKey];
+    if (!a) throw new Error(`Unknown player animKey: ${animKey}`);
+    return `./assets/player/${a.folder}/${a.prefix}.${i}.png`;
+  }
+};
+
+
+async function loadPlayerFrames(animKey) {
+  const max = PLAYER_FRAME_COUNTS[animKey] ?? 1;
+  const frames = [];
+
+  for (let i = 0; i < max; i++) {
+    const img = new Image();
+    img.src = PLAYER_PATHS.frame(animKey, i);
+
+    const ok = await new Promise(res => {
+      img.onload = () => res(true);
+      img.onerror = () => res(false);
+    });
+
+    if (ok) {
+      frames.push(img);
+    } else {
+      addError(`Missing player frame: ${animKey} #${i} (${img.src})`);
+      // לא דוחפים תמונה שלא נטענה
+      break;
+    }
+  }
+
+  return frames;
+}
+
+
+
+let mapBgImg = null;
 
 function nowMs() { return performance.now(); }
 function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
@@ -62,6 +148,20 @@ function addError(msg) {
   UI.errors.textContent = (UI.errors.textContent ? UI.errors.textContent + "\n" : "") + msg;
 }
 
+// ===== WORLD (3 platforms) =====
+const WORLD = {
+  platforms: [
+    // ground (כמו שהיה)
+    { x: 0, y: CONFIG.groundY, w: canvas.width, h: canvas.height - CONFIG.groundY },
+
+    // 3 main long platforms (תתחיל איתם)
+    { x: 238, y: 215, w: 485, h: 18 }, // top long
+    { x: 199, y: 293, w: 560, h: 18 }, // mid long
+    { x: 160, y:370, w: 638, h: 18 }, // bottom long
+  ],
+};
+
+
 function pickFirstVariant(framebooks, prefix) {
   const keys = Object.keys(framebooks || {});
   const variants = [];
@@ -74,14 +174,12 @@ function pickFirstVariant(framebooks, prefix) {
 }
 
 function chooseAnimNames(stats) {
-  // Prefer names from framebooks if present, otherwise return common defaults.
   const fb = stats.framebooks || {};
   const keys = Object.keys(fb);
 
   const stand = fb.stand ? "stand" : (keys.includes("stand") ? "stand" : "stand");
   const move  = fb.move  ? "move"  : (keys.includes("move") ? "move" : "move");
 
-  // If framebooks exist, prefer the first hitX/dieX. If not, we'll probe in loadMobFrames.
   const hit = pickFirstVariant(fb, "hit") || (fb.hit ? "hit" : "hit1");
   const die = pickFirstVariant(fb, "die") || (fb.die ? "die" : "die1");
 
@@ -97,29 +195,32 @@ function loadImage(src) {
   });
 }
 
+
 const mobFrames = new Map();
+const playerFrames = new Map();
+
 
 async function probeFrameCount(mobId, anim, maxProbe = 80) {
-  // Try to load frames 000.. until we see a couple misses AFTER at least one success.
   const frames = [];
-  let misses = 0;
+  let foundAny = false;
+
   for (let i = 0; i < maxProbe; i++) {
     const r = await loadImage(PATHS.frame(mobId, anim, i));
     if (r.ok) {
       frames.push(r.img);
-      misses = 0;
+      foundAny = true;
     } else {
-      if (frames.length === 0) {
-        misses++;
-        if (misses >= 3) break;
-      } else {
-        misses++;
-        if (misses >= 2) break;
-      }
+      // אם כבר מצאנו לפחות פריים אחד – עוצרים מיד
+      if (foundAny) break;
+
+      // אם עדיין לא מצאנו כלום, ננסה עוד קצת (למקרה שמתחיל מ-001)
+      if (i >= 3) break;
     }
   }
+
   return frames;
 }
+
 
 async function probeFirstAvailable(mobId, candidates) {
   for (const anim of candidates) {
@@ -148,10 +249,8 @@ function buildDieCandidates(stats) {
 }
 
 async function loadMobFrames(mobId, stats) {
-  const fb = stats.framebooks || {};
   const missing = new Set();
 
-  // Stand / Move: try exact names first
   let standPick = await probeFirstAvailable(mobId, ["stand"]);
   if (!standPick.frames.length) {
     missing.add(`${mobId}/stand`);
@@ -163,7 +262,6 @@ async function loadMobFrames(mobId, stats) {
     movePick = { anim: "move", frames: standPick.frames };
   }
 
-  // Hit / Die: probe likely variants
   const hitCandidates = buildHitCandidates(stats);
   let hitPick = await probeFirstAvailable(mobId, hitCandidates);
   if (!hitPick.frames.length) {
@@ -212,6 +310,14 @@ function getMobFrame(mobId, state, tMs) {
   const frameIdx = Math.floor((tMs / 1000) * CONFIG.fps) % frames.length;
   return frames[frameIdx] || null;
 }
+function getPlayerFrame(anim, tMs) {
+  const frames = playerFrames.get(anim);
+  if (!frames || frames.length === 0) return null;
+
+  const idx = Math.floor((tMs / 1000) * CONFIG.fps) % frames.length;
+  return frames[idx] ?? null;
+}
+
 
 let mobStatsMap = new Map();
 let questsDb = null;
@@ -222,15 +328,30 @@ const keys = new Set();
 
 const player = {
   x: 120,
-  y: 380,
+  y: 0,
   w: 50,
   h: 70,
   facing: 1,
+
+  anim: "stand",
+  animUntil: 0,
+
+  attackVariant: 0, // 👈 תוסיף את זה כאן
+
+  vx: 0,
+  vy: 0,
+  onGround: false,
+
   speed: CONFIG.playerSpeed,
   damage: CONFIG.playerDamage,
   exp: 0,
   lastAttackAt: 0,
+
+  maxHP: CONFIG.playerMaxHP,
+  hp: CONFIG.playerMaxHP,
+  lastHurtAt: -999999,
 };
+
 
 let mobs = [];
 let lastSpawnAt = 0;
@@ -249,17 +370,25 @@ function computeMobSpeedPxPerSec(mobId) {
   return CONFIG.mobBaseSpeedPxPerSec * factor;
 }
 
-function spawnMob(mobId, x) {
+function mobYOnPlatform(p, mobH = 60) {
+  return p.y - mobH;
+}
+
+function spawnMob(mobId, x, platform = null) {
   const stats = mobStatsMap.get(Number(mobId));
   if (!stats) throw new Error(`Missing mob stats for id=${mobId}.`);
 
   const maxHP = getMobStat(mobId, "maxHP", 10);
   const exp = getMobStat(mobId, "exp", 0);
 
+  const w = 20, h = 20;
+  const y = platform ? mobYOnPlatform(platform, h) : (CONFIG.groundY - h);
+
   return {
     id: Number(mobId),
-    x, y: CONFIG.groundY - 60,
-    w: 60, h: 60,
+    x, y,
+    w, h,
+    platform, // NEW
     maxHP, hp: maxHP,
     exp,
     state: "stand",
@@ -284,6 +413,28 @@ function intersects(a, b) {
     a.y + a.h > b.y
   );
 }
+function playerBoxAt(x, y) {
+  return {
+    x: x + PLAYER_HITBOX.offsetX,
+    y: y + PLAYER_HITBOX.offsetY,
+    w: PLAYER_HITBOX.w,
+    h: PLAYER_HITBOX.h,
+  };
+}
+
+function playerBox() {
+  return playerBoxAt(player.x, player.y);
+}
+
+function hurtPlayerFromMob(m) {
+  const t = nowMs();
+
+  if (t - player.lastHurtAt < CONFIG.touchDamageCooldownMs) return;
+
+  const dmg = getMobStat(m.id, "damage", 1);
+  player.hp = Math.max(0, player.hp - dmg);
+  player.lastHurtAt = t;
+}
 
 function onMobKilled(mobId) {
   if (!questState || !questState.activeQuest) return;
@@ -304,6 +455,14 @@ function tryAttack() {
   const t = nowMs();
   if (t - player.lastAttackAt < CONFIG.attackCooldownMs) return;
   player.lastAttackAt = t;
+  const variants = ["attack1", "attack2", "attackF"];
+
+  player.anim = variants[player.attackVariant];
+  player.animUntil = t + 220;
+
+  player.attackVariant = (player.attackVariant + 1) % variants.length;
+
+
 
   const atk = {
     x: player.facing === 1 ? player.x + player.w : player.x - 34,
@@ -379,6 +538,7 @@ async function completeQuest(quest) {
   }
 
   await refreshNeededAssets();
+
 }
 
 function getQuestTargetMobIds() {
@@ -393,11 +553,12 @@ function getQuestTargetMobIds() {
 
 function renderQuestUI() {
   const q = questState.activeQuest;
+
   if (!q) {
     UI.questTitle.textContent = "All quests completed!";
     UI.questDesc.textContent = "You finished the quest chain.";
     UI.questProgress.textContent = "";
-    UI.playerStats.textContent = `EXP: ${player.exp} | Damage: ${player.damage} | Mobs: ${mobs.length}`;
+    UI.playerStats.textContent = `HP: ${player.hp}/${player.maxHP} | EXP: ${player.exp} | Damage: ${player.damage} | Mobs: ${mobs.length}`;
     return;
   }
 
@@ -416,7 +577,7 @@ function renderQuestUI() {
   }
 
   UI.questProgress.textContent = lines.join(" | ");
-  UI.playerStats.textContent = `EXP: ${player.exp} | Damage: ${player.damage} | Mobs: ${mobs.length}`;
+  UI.playerStats.textContent = `HP: ${player.hp}/${player.maxHP} | EXP: ${player.exp} | Damage: ${player.damage} | Mobs: ${mobs.length}`;
 }
 
 async function refreshNeededAssets() {
@@ -442,20 +603,92 @@ async function refreshNeededAssets() {
 
   const targets = getQuestTargetMobIds();
   if (targets.length) {
-    mobs.push(spawnMob(targets[0], 540));
-    mobs.push(spawnMob(targets[0], 680));
+    const id = targets[0];
+    const plats = WORLD.platforms.slice(1);
+    for (let i = 0; i < 10; i++) {
+      const p = plats[i % plats.length];
+      const x = p.x + 30 + Math.random() * (p.w - 90);
+      mobs.push(spawnMob(id, x, p));
+    }
+    for (let i = 0; i < 3; i++) {
+  const x = 30 + Math.random() * (canvas.width - 60);
+  mobs.push(spawnMob(id, x, null));
+}
+
   }
+  
+}
+
+// ===== NEW: Jump =====
+function tryJump() {
+  if (!player.onGround) return;
+  player.vy = -CONFIG.jumpVel;
+  player.onGround = false;
 }
 
 function updatePlayer(dt) {
+  // ===== INPUT =====
   let vx = 0;
-  if (keys.has("ArrowLeft")) { vx = -player.speed; player.facing = -1; }
-  if (keys.has("ArrowRight")) { vx = player.speed; player.facing = 1; }
+  if (keys.has("ArrowLeft")) { 
+    vx = -player.speed; 
+    player.facing = -1; 
+  }
+  if (keys.has("ArrowRight")) { 
+    vx = player.speed; 
+    player.facing = 1; 
+  }
+  player.vx = vx;
 
-  player.x += vx * dt;
+  const prevX = player.x;
+  const prevY = player.y;
+  const prevPB = playerBoxAt(prevX, prevY);
+
+  // ===== PHYSICS =====
+  player.x += player.vx * dt;
+  player.vy += CONFIG.gravity * dt;
+  player.y += player.vy * dt;
+
+  // screen bounds
   player.x = clamp(player.x, 0, canvas.width - player.w);
+
+  player.onGround = false;
+
+  // ===== PLATFORM COLLISION (swept feet test) =====
+  for (const p of WORLD.platforms.slice(1)) {
+    const pbNow = playerBox();
+    const isFalling = player.vy >= 0;
+
+    const withinX =
+      (pbNow.x + pbNow.w) > p.x &&
+      pbNow.x < (p.x + p.w);
+
+    const prevFeet = prevPB.y + prevPB.h;
+    const nowFeet  = pbNow.y + pbNow.h;
+
+    // עברנו את קו הפלטפורמה מלמעלה למטה
+    const crossedTop = (prevFeet <= p.y) && (nowFeet >= p.y);
+
+    if (withinX && isFalling && crossedTop) {
+      player.y = (p.y - pbNow.h) - PLAYER_HITBOX.offsetY + PLAYER_HITBOX.footPad;
+      player.vy = 0;
+      player.onGround = true;
+      break;
+    }
+  }
+
+  // ===== GROUND COLLISION (only if not on platform) =====
+  if (!player.onGround) {
+    const pb = playerBox();
+    if (pb.y + pb.h >= CONFIG.groundY) {
+      player.y = (CONFIG.groundY - pb.h) - PLAYER_HITBOX.offsetY;
+      player.vy = 0;
+      player.onGround = true;
+    }
+  }
 }
 
+
+// ===== UPDATED: Mobs move on their platform and flip direction =====
 function updateMobs(dt) {
   const t = nowMs();
 
@@ -464,6 +697,7 @@ function updateMobs(dt) {
 
     if (m.state === "hit" && t < m.stateUntil) continue;
 
+    // choose direction sometimes
     if (t >= m.nextWanderSwitchAt) {
       m.dir = Math.random() < 0.5 ? -1 : 1;
       m.nextWanderSwitchAt = t + randBetween(CONFIG.mobWanderSwitchMsMin, CONFIG.mobWanderSwitchMsMax);
@@ -472,13 +706,33 @@ function updateMobs(dt) {
     const dx = m.dir * m.speed * dt;
     m.x += dx;
 
-    if (m.x <= 0) { m.x = 0; m.dir = 1; }
-    if (m.x >= canvas.width - m.w) { m.x = canvas.width - m.w; m.dir = -1; }
+
+    // platform bounds
+    const p = m.platform || { x: 0, y: CONFIG.groundY, w: canvas.width, h: 9999 };
+    const minX = p.x;
+    const maxX = p.x + p.w - m.w;
+
+    if (m.x <= minX) { m.x = minX; m.dir = 1; }
+    if (m.x >= maxX) { m.x = maxX; m.dir = -1; }
+
+    // keep y glued to platform top
+    m.y = mobYOnPlatform(p, m.h);
 
     m.state = Math.abs(dx) > 0.01 ? "move" : "stand";
   }
 
   mobs = mobs.filter(m => !(m.dead && m.state === "die" && nowMs() >= m.stateUntil));
+}
+
+function checkPlayerMobCollisions() {
+  if (player.hp <= 0) return;
+
+  for (const m of mobs) {
+    if (m.dead) continue;
+    if (intersects(player, m)) {
+      hurtPlayerFromMob(m);
+    }
+  }
 }
 
 function spawnLogic() {
@@ -489,30 +743,105 @@ function spawnLogic() {
   if (t - lastSpawnAt < CONFIG.spawnIntervalMs) return;
   lastSpawnAt = t;
 
-  if (mobs.length >= CONFIG.spawnMaxOnScreen) return;
+  const aliveCount = mobs.filter(m => !m.dead).length;
+  if (aliveCount >= CONFIG.spawnMaxOnScreen) return;
 
   const id = targets[0];
-  mobs.push(spawnMob(id, 380 + Math.random() * 520));
+
+  const plats = WORLD.platforms.slice(1);
+  const p = plats[Math.floor(Math.random() * plats.length)];
+  const x = p.x + 10 + Math.random() * (p.w - 80);
+
+  mobs.push(spawnMob(id, x, p));
+}
+
+function drawFlipped(img, x, y, w, h) {
+  ctx.save();
+  ctx.translate(x + w / 2, 0);
+  ctx.scale(-1, 1);
+  ctx.drawImage(img, -w / 2, y, w, h);
+  ctx.restore();
 }
 
 function render() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  ctx.fillStyle = "#222";
-  ctx.fillRect(0, CONFIG.groundY, canvas.width, canvas.height - CONFIG.groundY);
+  if (mapBgImg) {
+    ctx.drawImage(mapBgImg, 0, 0, canvas.width, canvas.height);
+  }
 
-  ctx.fillStyle = "#66ccff";
-  ctx.fillRect(player.x, player.y, player.w, player.h);
-
+  // time once per frame
   const t = nowMs();
+
+  /*
+  // DEBUG: show platforms
+  ctx.fillStyle = "rgba(255,0,0,0.35)";
+  for (const p of WORLD.platforms) {
+    ctx.fillRect(p.x, p.y, p.w, p.h);
+  }
+  */
+// DEBUG hitbox
+const pb = playerBox();
+ctx.save();
+ctx.strokeStyle = "lime";
+ctx.strokeRect(pb.x, pb.y, pb.w, pb.h);
+
+// feet line
+ctx.strokeStyle = "yellow";
+ctx.beginPath();
+ctx.moveTo(pb.x, pb.y + pb.h);
+ctx.lineTo(pb.x + pb.w, pb.y + pb.h);
+ctx.stroke();
+ctx.restore();
+
+  // ===== PLAYER DRAW (image) =====
+  // choose anim (attack priority)
+  let anim = "stand";
+  if (t < player.animUntil) anim = player.anim;
+  else if (!player.onGround) anim = "jump";
+  else if (Math.abs(player.vx) > 1) anim = "walk";
+
+  const pImg = getPlayerFrame(anim, t);
+
+    // align draw to hitbox feet (prevents "floating" visuals)
+  const pbox = playerBox();
+  const feetY = pbox.y + pbox.h;
+  const drawY = feetY - player.h;
+
+  
+
+  if (pImg) {
+    if (player.facing === 1) ctx.drawImage(pImg, player.x, drawY, player.w, player.h);
+    else drawFlipped(pImg, player.x, drawY, player.w, player.h);
+  } else {
+    ctx.fillStyle = "magenta";
+    ctx.fillRect(player.x, drawY, player.w, player.h);
+  }
+
+
+  // player HP bar (above head)
+  const px = player.x;
+  const py = player.y - 12;
+  const pw = player.w;
+  const ph = 6;
+
+  ctx.fillStyle = "rgba(255,255,255,0.25)";
+  ctx.fillRect(px, py, pw, ph);
+  ctx.fillStyle = "rgba(0,255,0,0.7)";
+  ctx.fillRect(px, py, pw * (player.hp / Math.max(1, player.maxHP)), ph);
+
+  // ===== MOBS DRAW =====
   for (const m of mobs) {
     const img = getMobFrame(m.id, m.state, t);
-    if (img) ctx.drawImage(img, m.x, m.y, m.w, m.h);
-    else {
+    if (img) {
+      if (m.dir === 1) drawFlipped(img, m.x, m.y, m.w, m.h);
+      else ctx.drawImage(img, m.x, m.y, m.w, m.h);
+    } else {
       ctx.fillStyle = "#ff6";
       ctx.fillRect(m.x, m.y, m.w, m.h);
     }
 
+    // mob hp bar
     ctx.fillStyle = "rgba(255,255,255,0.25)";
     ctx.fillRect(m.x, m.y - 10, m.w, 6);
     ctx.fillStyle = "rgba(0,255,0,0.7)";
@@ -530,6 +859,7 @@ function loop() {
 
   updatePlayer(dt);
   updateMobs(dt);
+  checkPlayerMobCollisions();
   spawnLogic();
   render();
 
@@ -539,20 +869,64 @@ function loop() {
 window.addEventListener("keydown", (e) => {
   if (e.code === "Space") e.preventDefault();
   keys.add(e.code);
+
+  if (e.code === "ArrowUp") tryJump();
   if (e.code === "Space") tryAttack();
 });
 window.addEventListener("keyup", (e) => keys.delete(e.code));
 
 async function boot() {
-  const statsList = await fetchJsonFirstOk([PATHS.statsPrimary, PATHS.statsFallback, '/stats/mobs_stats.json']);
+  const statsList = await fetchJsonFirstOk([
+    PATHS.statsPrimary,
+    PATHS.statsFallback,
+    "/stats/mobs_stats.json",
+  ]);
   mobStatsMap = new Map(statsList.map(x => [Number(x.id), x]));
 
   questsDb = await fetchJson(PATHS.quests);
   initQuestState();
+
+  // place player on ground
+  player.y = CONFIG.groundY - player.h;
+  player.vy = 0;
+  player.onGround = true;
+
+  // load mobs frames needed for current quest
   await refreshNeededAssets();
+
+  // load player frames (must match your filenames)
+  playerFrames.set("stand", await loadPlayerFrames("stand"));
+  playerFrames.set("walk", await loadPlayerFrames("walk"));
+  playerFrames.set("jump", await loadPlayerFrames("jump"));
+  playerFrames.set("attack1", await loadPlayerFrames("attack1"));
+  playerFrames.set("attack2", await loadPlayerFrames("attack2"));
+  playerFrames.set("attackF", await loadPlayerFrames("attackF"));
+  playerFrames.set("climbRope", await loadPlayerFrames("climbRope"));
+  playerFrames.set("climbLadder", await loadPlayerFrames("climbLadder"));
+
+  console.log("PLAYER FRAMES LOADED:", {
+  stand: playerFrames.get("stand")?.length ?? 0,
+  walk: playerFrames.get("walk")?.length ?? 0,
+  jump: playerFrames.get("jump")?.length ?? 0,
+  attack: playerFrames.get("attack")?.length ?? 0,
+  climbRope: playerFrames.get("climbRope")?.length ?? 0,
+  climbLadder: playerFrames.get("climbLadder")?.length ?? 0,
+});
+
+
+  // OPTIONAL DEBUG: show if something failed to load
+  for (const k of ["stand", "walk", "jump", "attack", "climbRope", "climbLadder"]) {
+    const n = playerFrames.get(k)?.length ?? 0;
+    if (!n) addError(`PLAYER FRAMES MISSING: ${k}`);
+  }
+
+  const bg = await loadImage(PATHS.mapBg);
+  if (bg.ok) mapBgImg = bg.img;
+  else addError("Failed to load map bg: " + PATHS.mapBg);
 
   requestAnimationFrame(loop);
 }
+
 
 boot().catch(err => {
   console.error(err);

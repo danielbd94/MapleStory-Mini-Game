@@ -2,23 +2,22 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>MapleStory Mini-Game</title>
+  <title>Maple Mini RPG</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
     body { margin:0; background:#111; color:#eee; font-family: Arial, sans-serif; }
     #hud {
       position:fixed; top:10px; left:10px;
-      background:rgba(0,0,0,.60); padding:12px;
-      border-radius:10px; max-width: 520px;
+      background:rgba(0,0,0,.6); padding:12px;
+      border-radius:10px; max-width:520px;
     }
     #questTitle { font-weight:700; margin-bottom:6px; }
-    #questDesc { opacity:.9; margin-bottom:10px; }
-    #questProgress { opacity:.9; }
-    #playerStats { opacity:.85; margin-top:10px; }
-    #errors { margin-top:10px; color:#ffb3b3; white-space:pre-wrap; font-size: 13px; }
+    #questDesc { margin-bottom:8px; }
+    #questProgress { margin-bottom:6px; }
+    #playerStats { margin-top:8px; }
+    #errors { margin-top:8px; color:#ffb3b3; white-space:pre-wrap; font-size:13px; }
     canvas { display:block; margin:0 auto; background:#1b1b1b; }
-    .small { opacity:.75; margin-top:8px; font-size: 13px; }
-    a { color:#9bd; }
+    .small { font-size:13px; opacity:.8; margin-top:6px; }
   </style>
 </head>
 <body>
@@ -27,7 +26,7 @@
     <div id="questDesc"></div>
     <div id="questProgress"></div>
     <div id="playerStats"></div>
-    <div class="small">Move: ← → | Attack: Space</div>
+    <div class="small">Move: ← → | Jump: ↑ | Attack: Space</div>
     <div id="errors"></div>
   </div>
 
