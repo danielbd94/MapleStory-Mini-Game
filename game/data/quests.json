@@ -1,15 +1,39 @@
 {
+  "maps": {
+    "farm": {
+      "bgPath": "./assets/maps/farm.png",
+      "groundY": 465,
+      "platforms": [
+        { "x": 0, "y": 465, "w": 960, "h": 75 },
+        { "x": 238, "y": 215, "w": 485, "h": 18 },
+        { "x": 199, "y": 293, "w": 560, "h": 18 },
+        { "x": 160, "y": 370, "w": 638, "h": 18 }
+      ]
+    },
+    "b1map": {
+      "bgPath": "./assets/maps/b1map.png",
+      "groundY": 480,
+      "platforms": [
+        { "x": 35, "y": 480, "w": 925, "h": 105 },
+        { "x": 290, "y": 105, "w": 330, "h": 18 },
+        { "x": 255, "y": 190, "w": 400, "h": 18 },
+        { "x": 160, "y": 290, "w": 600, "h": 18 }
+      ]
+    }
+  },
   "quests": [
     {
       "id": "q1",
+      "map": "farm",
       "title": "Snail Trouble",
       "description": "Kill 6 Snails",
-      "requirements": [{ "type": "kill", "mobId": 100100, "count": 6 }],
+      "requirements": [{ "type": "kill", "mobId": 100100, "count": 3 }],
       "rewards": { "exp": 10 },
       "unlocks": ["q2"]
     },
     {
       "id": "q2",
+      "map": "farm",
       "title": "Blue Invasion",
       "description": "Kill 6 Blue Snails",
       "requirements": [{ "type": "kill", "mobId": 100101, "count": 6 }],
@@ -18,6 +42,7 @@
     },
     {
       "id": "q3",
+      "map": "farm",
       "title": "Red Shell Menace",
       "description": "Kill 8 Red Snails",
       "requirements": [{ "type": "kill", "mobId": 130101, "count": 8 }],
@@ -26,6 +51,7 @@
     },
     {
       "id": "q4",
+      "map": "farm",
       "title": "Shroom Forest",
       "description": "Kill 8 Shrooms",
       "requirements": [{ "type": "kill", "mobId": 120100, "count": 8 }],
@@ -34,6 +60,7 @@
     },
     {
       "id": "q5",
+      "map": "farm",
       "title": "Orange Threat",
       "description": "Kill 10 Orange Mushrooms",
       "requirements": [{ "type": "kill", "mobId": 1210102, "count": 10 }],
@@ -42,6 +69,7 @@
     },
     {
       "id": "q6",
+      "map": "farm",
       "title": "Green Swarm",
       "description": "Kill 10 Green Mushrooms",
       "requirements": [{ "type": "kill", "mobId": 1110100, "count": 10 }],
@@ -50,6 +78,7 @@
     },
     {
       "id": "q7",
+      "map": "farm",
       "title": "Sticky Situation",
       "description": "Kill 12 Slimes",
       "requirements": [{ "type": "kill", "mobId": 210100, "count": 12 }],
@@ -58,6 +87,7 @@
     },
     {
       "id": "q8",
+      "map": "farm",
       "title": "Forest Spirits",
       "description": "Kill 12 Stumps",
       "requirements": [{ "type": "kill", "mobId": 130100, "count": 12 }],
@@ -66,17 +96,19 @@
     },
     {
       "id": "q9",
+      "map": "farm",
       "title": "Pig Hunt",
       "description": "Kill 10 Ribbon Pigs",
       "requirements": [{ "type": "kill", "mobId": 1210101, "count": 10 }],
       "rewards": { "exp": 300 },
-      "unlocks": ["qBoss"]
+      "unlocks": ["qBoss1"]
     },
     {
-      "id": "qBoss",
+      "id": "qBoss1",
+      "map": "b1map",
       "title": "Mushroom King",
       "description": "Defeat the Giant Orange Mushroom",
-      "requirements": [{ "type": "kill", "mobId": 9500326, "count": 1 }],
+      "requirements": [{ "type": "kill", "mobId": 6130101, "count": 1 }],
       "rewards": { "exp": 1200 },
       "unlocks": []
     }

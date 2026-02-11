@@ -20,11 +20,6 @@ function resizeCanvas() {
 resizeCanvas();
 window.addEventListener("resize", resizeCanvas);
 
-function updateResponsiveValues() {
-  // Keep game logic in original 960x540 space
-  // Only scale at render time for visual display
-}
-
 const UI = {
   questTitle: document.getElementById("questTitle"),
   questDesc: document.getElementById("questDesc"),
@@ -79,7 +74,7 @@ const PLAYER_HITBOX = {
 };
 const PLAYER_DRAW_OFFSET_Y = 18; // כוונון גובה ויזואלי בלבד
 
-  const PATHS = {
+let PATHS = {
   statsPrimary: `./assets/data/mobs_stats.json`,
   statsFallback: `./assets/data/mobs_stats.json`,
   quests: `./data/quests.json`,
@@ -258,17 +253,14 @@ function addError(msg) {
   UI.errors.textContent = (UI.errors.textContent ? UI.errors.textContent + "\n" : "") + msg;
 }
 
-// ===== WORLD (3 platforms) in original 960x540 space =====
-// ===== WORLD (3 platforms) in original 960x540 space =====
-const WORLD = {
+// ===== WORLD will be dynamically loaded from quests.json =====
+let WORLD = {
+  groundY: 465,
   platforms: [
-    // ground (כמו שהיה)
-    { x: 0, y: 465, w: 960, h: 540 - 465 },
-
-    // 3 main long platforms
-    { x: 238, y: 215, w: 485, h: 18 }, // top long
-    { x: 199, y: 293, w: 560, h: 18 }, // mid long
-    { x: 160, y:370, w: 638, h: 18 }, // bottom long
+    { x: 0, y: 465, w: 960, h: 75 },
+    { x: 238, y: 215, w: 485, h: 18 },
+    { x: 199, y: 293, w: 560, h: 18 },
+    { x: 160, y: 370, w: 638, h: 18 }
   ],
 };
 
@@ -434,6 +426,10 @@ let mobStatsMap = new Map();
 let questsDb = null;
 let questIndex = new Map();
 let questState = null;
+let mapsDb = {};
+let currentMapName = "";
+
+
 
 const keys = new Set();
 
@@ -502,7 +498,7 @@ function spawnMob(mobId, x, platform = null) {
   const exp = getMobStat(mobId, "exp", 0);
 
   const w = 20, h = 20;
-  const y = platform ? mobYOnPlatform(platform, h) : (CONFIG.groundY - h);
+  const y = platform ? mobYOnPlatform(platform, h) : (WORLD.groundY - h);
 
   return {
     id: Number(mobId),
@@ -640,6 +636,34 @@ function isQuestCompleted(quest, progress) {
   return true;
 }
 
+async function loadMapForQuest(questId) {
+  const quest = questIndex.get(questId);
+  if (!quest || !quest.map) return;
+
+  const mapKey = quest.map;
+  const mapDef = mapsDb[mapKey];
+  if (!mapDef) {
+    addError(`Map not found: ${mapKey}`);
+    return;
+  }
+
+  PATHS.mapBg = mapDef.bgPath;
+
+  // Update WORLD with the map data from quests.json
+  WORLD = {
+    groundY: mapDef.groundY,
+    platforms: mapDef.platforms,
+  };
+  
+  // Store the current map name for boss detection
+  currentMapName = mapKey;
+
+  // Reload the map image
+  const bg = await loadImage(PATHS.mapBg);
+  if (bg.ok) mapBgImg = bg.img;
+  else addError("Failed to load map: " + PATHS.mapBg);
+}
+
 async function completeQuest(quest) {
   questState.completed.add(quest.id);
 
@@ -655,6 +679,23 @@ async function completeQuest(quest) {
   } else {
     questState.activeQuestId = null;
     questState.activeQuest = null;
+  }
+
+  // Load the appropriate map for the active quest
+  if (questState.activeQuestId) {
+    await loadMapForQuest(questState.activeQuestId);
+    
+    // For qBoss quests, place player on ground platform
+    if (questState.activeQuestId.startsWith("qBoss")) {
+      const groundPlatform = WORLD.platforms[0];
+      player.y = groundPlatform.y - PLAYER_HITBOX.offsetY - PLAYER_HITBOX.h;
+    } else {
+      // For normal quests, place on the third floating platform
+      const thirdPlatform = WORLD.platforms[3];
+      player.y = thirdPlatform.y - PLAYER_HITBOX.offsetY - PLAYER_HITBOX.h;
+    }
+    player.vy = 0;
+    player.onGround = true;
   }
 
   await refreshNeededAssets();
@@ -724,17 +765,25 @@ async function refreshNeededAssets() {
   const targets = getQuestTargetMobIds();
   if (targets.length) {
     const id = targets[0];
-    const plats = WORLD.platforms.slice(1);
-    for (let i = 0; i < 10; i++) {
-      const p = plats[i % plats.length];
-      const x = p.x + 30 + Math.random() * (p.w - 90);
-      mobs.push(spawnMob(id, x, p));
+    
+    // For qBoss quests, only spawn 1 mob at ground platform
+    if (questState.activeQuestId && questState.activeQuestId.startsWith("qBoss")) {
+      const groundPlatform = WORLD.platforms[0]; // ground platform
+      const x = groundPlatform.x + 100 + Math.random() * (groundPlatform.w - 200);
+      mobs.push(spawnMob(id, x, groundPlatform));
+    } else {
+      // Normal quest spawning
+      const plats = WORLD.platforms.slice(1);
+      for (let i = 0; i < 10; i++) {
+        const p = plats[i % plats.length];
+        const x = p.x + 30 + Math.random() * (p.w - 90);
+        mobs.push(spawnMob(id, x, p));
+      }
+      for (let i = 0; i < 3; i++) {
+        const x = 30 + Math.random() * (canvas.width - 60);
+        mobs.push(spawnMob(id, x, null));
+      }
     }
-    for (let i = 0; i < 3; i++) {
-  const x = 30 + Math.random() * (canvas.width - 60);
-  mobs.push(spawnMob(id, x, null));
-}
-
   }
   
 }
@@ -769,7 +818,7 @@ function updatePlayer(dt) {
   player.y += player.vy * dt;
 
   // screen bounds
-  player.x = clamp(player.x, 0, canvas.width - player.w);
+  player.x = clamp(player.x, 0, ORIGINAL_WIDTH - player.w);
 
   player.onGround = false;
 
@@ -813,8 +862,8 @@ function updatePlayer(dt) {
   // ===== GROUND COLLISION (only if not on platform) =====
   if (!player.onGround) {
     const pb = playerBox();
-    if (pb.y + pb.h >= CONFIG.groundY) {
-      player.y = (CONFIG.groundY - pb.h) - PLAYER_HITBOX.offsetY;
+    if (pb.y + pb.h >= WORLD.groundY) {
+      player.y = (WORLD.groundY - pb.h) - PLAYER_HITBOX.offsetY;
       player.vy = 0;
       player.onGround = true;
     }
@@ -841,7 +890,7 @@ function updateMobs(dt) {
     m.x += dx;
 
     // platform bounds with safety margin
-    const p = m.platform || { x: 0, y: CONFIG.groundY, w: ORIGINAL_WIDTH, h: 9999 };
+    const p = m.platform || { x: 0, y: WORLD.groundY, w: ORIGINAL_WIDTH, h: 9999 };
     const minX = p.x;
     const maxX = p.x + p.w - m.w;
 
@@ -880,15 +929,26 @@ function spawnLogic() {
   lastSpawnAt = t;
 
   const aliveCount = mobs.filter(m => !m.dead).length;
-  if (aliveCount >= CONFIG.spawnMaxOnScreen) return;
+  
+  // For qBoss quests, only allow 1 mob and spawn at ground platform
+  if (questState.activeQuestId && questState.activeQuestId.startsWith("qBoss")) {
+    if (aliveCount >= 1) return;
+    
+    const id = targets[0];
+    const groundPlatform = WORLD.platforms[0]; // ground platform
+    const x = groundPlatform.x + 100 + Math.random() * (groundPlatform.w - 200);
+    mobs.push(spawnMob(id, x, groundPlatform));
+  } else {
+    // Normal quest spawning
+    if (aliveCount >= CONFIG.spawnMaxOnScreen) return;
 
-  const id = targets[0];
+    const id = targets[0];
+    const plats = WORLD.platforms.slice(1);
+    const p = plats[Math.floor(Math.random() * plats.length)];
+    const x = p.x + 10 + Math.random() * (p.w - 80);
 
-  const plats = WORLD.platforms.slice(1);
-  const p = plats[Math.floor(Math.random() * plats.length)];
-  const x = p.x + 10 + Math.random() * (p.w - 80);
-
-  mobs.push(spawnMob(id, x, p));
+    mobs.push(spawnMob(id, x, p));
+  }
 }
 
 function drawFlipped(img, x, y, w, h) {
@@ -915,7 +975,7 @@ function render() {
   for (const p of WORLD.platforms) {
     ctx.fillRect(p.x * scaleX, p.y * scaleY, p.w * scaleX, p.h * scaleY);
   }
-  */
+    */
 
   // ===== PLAYER DRAW (image) =====
   // choose anim (attack priority)
@@ -980,24 +1040,37 @@ function render() {
   // ===== MOBS DRAW =====
   for (const m of mobs) {
     const img = getMobFrame(m.id, m.state, t);
+    
+    // Check if this is a boss fight (map starts with 'b')
+    const isBoss = currentMapName.startsWith("b");
+    const scale = isBoss ? 5 : 1;
+    
     const mx = m.x * scaleX;
     const my = m.y * scaleY;
-    const mw = m.w * scaleX;
-    const mh = m.h * scaleY;
+    const mw = m.w * scaleX * scale;
+    const mh = m.h * scaleY * scale;
+    
+    // Center the boss sprite
+    const offsetX = isBoss ? (mw - m.w * scaleX) / 2 : 0;
+    const offsetY = isBoss ? (mh - m.h * scaleY) : 0;
 
     if (img) {
-      if (m.dir === 1) drawFlipped(img, mx, my, mw, mh);
-      else ctx.drawImage(img, mx, my, mw, mh);
+      if (m.dir === 1) drawFlipped(img, mx - offsetX, my - offsetY, mw, mh);
+      else ctx.drawImage(img, mx - offsetX, my - offsetY, mw, mh);
     } else {
       ctx.fillStyle = "#ff6";
-      ctx.fillRect(mx, my, mw, mh);
+      ctx.fillRect(mx - offsetX, my - offsetY, mw, mh);
     }
 
-    // mob hp bar
+    // mob hp bar (scaled for boss)
+    const hpBarY = (m.y - 15) * scaleY - (isBoss ? mh - m.h * scaleY : 0);
+    const hpBarW = mw;
+    const hpBarH = isBoss ? 10 * scaleY : 6 * scaleY;
+    
     ctx.fillStyle = "rgba(255,255,255,0.25)";
-    ctx.fillRect(mx, (m.y - 10) * scaleY, mw, 6 * scaleY);
-    ctx.fillStyle = "rgba(255,0,0,0.7)";
-    ctx.fillRect(mx, (m.y - 10) * scaleY, mw * (m.hp / m.maxHP), 6 * scaleY);
+    ctx.fillRect(mx - offsetX, hpBarY, hpBarW, hpBarH);
+    ctx.fillStyle = isBoss ? "rgba(255,100,0,0.9)" : "rgba(255,0,0,0.7)";
+    ctx.fillRect(mx - offsetX, hpBarY, hpBarW * (m.hp / m.maxHP), hpBarH);
   }
 
   renderQuestUI();
@@ -1037,9 +1110,18 @@ async function boot() {
   mobStatsMap = new Map(statsList.map(x => [Number(x.id), x]));
 
   questsDb = await fetchJson(PATHS.quests);
+  
+  // Load maps from quests.json
+  mapsDb = questsDb.maps || {};
+  
   initQuestState();
   player.expToNext = expNeededForLevel(player.level);
   applyLevelStats();
+  
+  // Load the map for the initial quest
+  if (questState.activeQuestId) {
+    await loadMapForQuest(questState.activeQuestId);
+  }
 
   // place player on third platform (not flying)
   // Feet should be at platform.y, so: player.y + offsetY + hitbox.h = platform.y
@@ -1078,10 +1160,6 @@ async function boot() {
     const n = playerFrames.get(k)?.length ?? 0;
     if (!n) addError(`PLAYER FRAMES MISSING: ${k}`);
   }
-
-  const bg = await loadImage(PATHS.mapBg);
-  if (bg.ok) mapBgImg = bg.img;
-  else addError("Failed to load map bg: " + PATHS.mapBg);
 
   // ===== STATS UI EVENTS =====
   UI.statsBtn?.addEventListener("click", () => {
