@@ -2,36 +2,82 @@
   "quests": [
     {
       "id": "q1",
-      "title": "Quest 1",
-      "description": "Kill 5 Snails",
-      "requirements": [
-        {
-          "type": "kill",
-          "mobId": 100100,
-          "count": 5
-        }
-      ],
-      "rewards": {
-        "exp": 0
-      },
-      "unlocks": [
-        "q2"
-      ]
+      "title": "Snail Trouble",
+      "description": "Kill 6 Snails",
+      "requirements": [{ "type": "kill", "mobId": 100100, "count": 6 }],
+      "rewards": { "exp": 10 },
+      "unlocks": ["q2"]
     },
     {
       "id": "q2",
-      "title": "Quest 2",
-      "description": "Kill 3 Blue Snails",
-      "requirements": [
-        {
-          "type": "kill",
-          "mobId": 100101,
-          "count": 3
-        }
-      ],
-      "rewards": {
-        "exp": 0
-      },
+      "title": "Blue Invasion",
+      "description": "Kill 6 Blue Snails",
+      "requirements": [{ "type": "kill", "mobId": 100101, "count": 6 }],
+      "rewards": { "exp": 20 },
+      "unlocks": ["q3"]
+    },
+    {
+      "id": "q3",
+      "title": "Red Shell Menace",
+      "description": "Kill 8 Red Snails",
+      "requirements": [{ "type": "kill", "mobId": 130101, "count": 8 }],
+      "rewards": { "exp": 35 },
+      "unlocks": ["q4"]
+    },
+    {
+      "id": "q4",
+      "title": "Shroom Forest",
+      "description": "Kill 8 Shrooms",
+      "requirements": [{ "type": "kill", "mobId": 120100, "count": 8 }],
+      "rewards": { "exp": 55 },
+      "unlocks": ["q5"]
+    },
+    {
+      "id": "q5",
+      "title": "Orange Threat",
+      "description": "Kill 10 Orange Mushrooms",
+      "requirements": [{ "type": "kill", "mobId": 1210102, "count": 10 }],
+      "rewards": { "exp": 80 },
+      "unlocks": ["q6"]
+    },
+    {
+      "id": "q6",
+      "title": "Green Swarm",
+      "description": "Kill 10 Green Mushrooms",
+      "requirements": [{ "type": "kill", "mobId": 1110100, "count": 10 }],
+      "rewards": { "exp": 115 },
+      "unlocks": ["q7"]
+    },
+    {
+      "id": "q7",
+      "title": "Sticky Situation",
+      "description": "Kill 12 Slimes",
+      "requirements": [{ "type": "kill", "mobId": 210100, "count": 12 }],
+      "rewards": { "exp": 160 },
+      "unlocks": ["q8"]
+    },
+    {
+      "id": "q8",
+      "title": "Forest Spirits",
+      "description": "Kill 12 Stumps",
+      "requirements": [{ "type": "kill", "mobId": 130100, "count": 12 }],
+      "rewards": { "exp": 220 },
+      "unlocks": ["q9"]
+    },
+    {
+      "id": "q9",
+      "title": "Pig Hunt",
+      "description": "Kill 10 Ribbon Pigs",
+      "requirements": [{ "type": "kill", "mobId": 1210101, "count": 10 }],
+      "rewards": { "exp": 300 },
+      "unlocks": ["qBoss"]
+    },
+    {
+      "id": "qBoss",
+      "title": "Mushroom King",
+      "description": "Defeat the Giant Orange Mushroom",
+      "requirements": [{ "type": "kill", "mobId": 9500326, "count": 1 }],
+      "rewards": { "exp": 1200 },
       "unlocks": []
     }
   ],

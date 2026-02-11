@@ -31,7 +31,16 @@ const UI = {
   questProgress: document.getElementById("questProgress"),
   playerStats: document.getElementById("playerStats"),
   errors: document.getElementById("errors"),
+
+  // NEW: stats panel
+  statsBtn: document.getElementById("statsBtn"),
+  statsPanel: document.getElementById("statsPanel"),
+  statsClose: document.getElementById("statsClose"),
+  statsInfo: document.getElementById("statsInfo"),
+  btnAddSTR: document.getElementById("btnAddSTR"),
+  btnAddVIT: document.getElementById("btnAddVIT"),
 };
+
 
 const CONFIG = {
   groundY: 465,
@@ -151,6 +160,84 @@ let mapBgImg = null;
 function nowMs() { return performance.now(); }
 function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
 function randBetween(a, b) { return a + Math.random() * (b - a); }
+
+function expNeededForLevel(lv) {
+  return Math.floor(30 + (lv - 1) * 18 + (lv - 1) * (lv - 1) * 6);
+}
+
+
+function applyLevelStats() {
+  // STR מעלה דמג'
+  player.damage = CONFIG.playerDamage + player.str * 1;
+
+  // VIT מעלה מקס HP
+  const oldMax = player.maxHP;
+  player.maxHP = CONFIG.playerMaxHP + player.vit * 3;
+
+  // לא מוריד HP כשמקס עולה
+  if (player.maxHP > oldMax) {
+    player.hp = Math.min(player.hp + (player.maxHP - oldMax), player.maxHP);
+  } else {
+    player.hp = Math.min(player.hp, player.maxHP);
+  }
+}
+
+
+function gainExp(amount) {
+  if (!Number.isFinite(amount) || amount <= 0) return;
+
+  player.exp += amount;
+
+  while (player.exp >= player.expToNext) {
+    player.exp -= player.expToNext;
+    player.level += 1;
+
+    // מקבלים נקודות לחלוקה בכל רמה
+    player.statPoints += 3;
+
+    player.expToNext = expNeededForLevel(player.level);
+
+    applyLevelStats();
+    addError(`LEVEL UP! You are now level ${player.level} (+3 SP)`);
+  }
+}
+function addSTR() {
+  if (player.statPoints <= 0) return;
+  player.statPoints -= 1;
+  player.str += 1;
+  applyLevelStats();
+}
+
+function addVIT() {
+  if (player.statPoints <= 0) return;
+  player.statPoints -= 1;
+  player.vit += 1;
+  applyLevelStats();
+}
+
+let statsOpen = false;
+
+function setStatsOpen(v) {
+  statsOpen = v;
+  if (UI.statsPanel) UI.statsPanel.style.display = statsOpen ? "block" : "none";
+}
+
+function toggleStats() {
+  setStatsOpen(!statsOpen);
+}
+
+function updateStatsPanelText() {
+  if (!UI.statsInfo) return;
+
+  UI.statsInfo.innerHTML =
+    `LV: <b>${player.level}</b><br>` +
+    `HP: <b>${player.hp}/${player.maxHP}</b><br>` +
+    `DMG: <b>${player.damage}</b><br>` +
+    `EXP: <b>${Math.floor(player.exp)}/${player.expToNext}</b><br>` +
+    `SP: <b>${player.statPoints}</b><br>` +
+    `STR: <b>${player.str}</b> | VIT: <b>${player.vit}</b>`;
+}
+
 
 async function fetchJson(url) {
   const r = await fetch(url);
@@ -360,7 +447,7 @@ const player = {
   anim: "stand",
   animUntil: 0,
 
-  attackVariant: 0, // 👈 תוסיף את זה כאן
+  attackVariant: 0,
 
   vx: 0,
   vy: 0,
@@ -369,6 +456,15 @@ const player = {
   speed: CONFIG.playerSpeed,
   damage: CONFIG.playerDamage,
   exp: 0,
+
+  level: 1,
+  expToNext: 30,
+
+  statPoints: 0,
+  str: 0,
+  vit: 0,
+
+
   lastAttackAt: 0,
 
   maxHP: CONFIG.playerMaxHP,
@@ -506,7 +602,7 @@ function tryAttack() {
       m.dead = true;
       setMobState(m, "die", CONFIG.dieStateMs);
 
-      player.exp += m.exp;
+      gainExp(m.exp);
       onMobKilled(m.id);
     } else {
       setMobState(m, "hit", CONFIG.hitStateMs);
@@ -852,7 +948,34 @@ function render() {
   ctx.fillStyle = "rgba(255,255,255,0.25)";
   ctx.fillRect(player.x * scaleX, (player.y - 12) * scaleY, player.w * scaleX, 6 * scaleY);
   ctx.fillStyle = "rgba(0,255,0,0.7)";
-  ctx.fillRect(player.x * scaleX, (player.y - 12) * scaleY, (player.w * (player.hp / Math.max(1, player.maxHP))) * scaleX, 6 * scaleY);
+  ctx.fillRect(
+    player.x * scaleX,
+    (player.y - 12) * scaleY,
+    (player.w * (player.hp / Math.max(1, player.maxHP))) * scaleX,
+    6 * scaleY
+  );
+
+  // ===== EXP BAR (bottom-left) =====
+  const barW = 260 * scaleX;
+  const barH = 10 * scaleY;
+  const bx = 12 * scaleX;
+  const by = (ORIGINAL_HEIGHT - 20) * scaleY; // אם לא יושב למטה, תגיד לי ונשנה ל-canvas.height
+
+  const ratio = player.expToNext > 0 ? (player.exp / player.expToNext) : 0;
+
+  ctx.fillStyle = "rgba(0,0,0,0.45)";
+  ctx.fillRect(bx, by, barW, barH);
+
+  ctx.fillStyle = "rgba(0,160,255,0.85)";
+  ctx.fillRect(bx, by, barW * clamp(ratio, 0, 1), barH);
+
+  ctx.fillStyle = "white";
+  ctx.font = `${14 * scaleY}px Arial`;
+  ctx.fillText(
+    `LV ${player.level}  EXP ${Math.floor(player.exp)}/${player.expToNext}`,
+    bx,
+    by - 4 * scaleY
+  );
 
   // ===== MOBS DRAW =====
   for (const m of mobs) {
@@ -879,6 +1002,7 @@ function render() {
 
   renderQuestUI();
 }
+
 
 let lastFrameAt = nowMs();
 function loop() {
@@ -914,6 +1038,8 @@ async function boot() {
 
   questsDb = await fetchJson(PATHS.quests);
   initQuestState();
+  player.expToNext = expNeededForLevel(player.level);
+  applyLevelStats();
 
   // place player on third platform (not flying)
   // Feet should be at platform.y, so: player.y + offsetY + hitbox.h = platform.y
@@ -956,6 +1082,26 @@ async function boot() {
   const bg = await loadImage(PATHS.mapBg);
   if (bg.ok) mapBgImg = bg.img;
   else addError("Failed to load map bg: " + PATHS.mapBg);
+
+  // ===== STATS UI EVENTS =====
+  UI.statsBtn?.addEventListener("click", () => {
+    UI.statsPanel.style.display =
+      UI.statsPanel.style.display === "block" ? "none" : "block";
+  });
+
+  UI.btnAddSTR?.addEventListener("click", () => {
+    addSTR();
+    updateStatsPanelText();
+  });
+
+  UI.btnAddVIT?.addEventListener("click", () => {
+    addVIT();
+    updateStatsPanelText();
+  });
+
+// עדכון ראשוני
+updateStatsPanelText();
+
 
   requestAnimationFrame(loop);
 }
