@@ -99,7 +99,7 @@
       "map": "farm",
       "title": "Pig Hunt",
       "description": "Kill 10 Ribbon Pigs",
-      "requirements": [{ "type": "kill", "mobId": 1210101, "count": 10 }],
+      "requirements": [{ "type": "kill", "mobId": 1210101, "count": 15 }],
       "rewards": { "exp": 300 },
       "unlocks": ["qBoss1"]
     },

@@ -106,6 +106,42 @@
       margin-top:10px;
     }
 
+    /* ===== INVENTORY BUTTON ===== */
+#invBtn {
+  position: fixed;
+  right: 15px;
+  bottom: 115px;
+  z-index: 200;
+  padding: 10px 14px;
+  font-size: 14px;
+  cursor: pointer;
+  border: none;
+  border-radius: 8px;
+  background: #00b36b;
+  color: white;
+  font-weight: bold;
+}
+
+/* ===== INVENTORY PANEL ===== */
+#invPanel {
+  position: fixed;
+  right: 15px;
+  bottom: 165px;
+  z-index: 200;
+  width: 260px;
+  padding: 14px;
+  background: rgba(0,0,0,0.85);
+  border-radius: 12px;
+  display: none;
+  box-shadow: 0 0 15px rgba(0,0,0,0.6);
+}
+
+#invPanel h3 {
+  margin: 0 0 8px 0;
+  font-size: 16px;
+}
+
+
   </style>
 </head>
 
@@ -137,6 +173,19 @@
       Spend your SP here.
     </div>
   </div>
+
+    <!-- INVENTORY BUTTON -->
+  <button id="invBtn">Inventory</button>
+
+  <!-- INVENTORY PANEL -->
+  <div id="invPanel">
+    <h3>Inventory</h3>
+    <div id="invInfo">Mesos: 0</div>
+    <div style="margin-top:8px; font-size:12px; opacity:.8;">
+      Press I to open.
+    </div>
+  </div>
+
 
   <canvas id="c"></canvas>
 
