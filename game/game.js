@@ -157,6 +157,60 @@ async function loadPlayerFrames(animKey) {
 
 let mapBgImg = null;
 
+// ===== SHOP NPC (STEP 1: draw only) =====
+const shopNpc = { x: 745, y: 0, w: 50, h: 70 };
+
+const shopNpcImg = new Image();
+let shopOpen = false;
+shopNpcImg.src = "./assets/ui/npc/npc.png";
+
+// ===== SHOP UI IMAGES (tabs) =====
+let shopTab = 1; // 1=EQUIP default
+
+const shopUiImgs = {};
+for (let i = 1; i <= 5; i++) {
+  const im = new Image();
+  im.src = `./assets/ui/shop/shop${i}.png`;
+  shopUiImgs[i] = im;
+}
+
+// store last drawn shop rect for mouse hit-tests
+let lastShopRect = null;
+
+// clickable zones inside the shop image (normalized 0..1)
+// we'll fine-tune later if needed
+const SHOP_TAB_HITBOX = [
+  { tab: 1, x: 0.52, y: 0.215, w: 0.12, h: 0.055 }, // EQUIP
+  { tab: 2, x: 0.64, y: 0.215, w: 0.10, h: 0.055 }, // USE
+  { tab: 3, x: 0.74, y: 0.215, w: 0.10, h: 0.055 }, // ETC
+  { tab: 4, x: 0.84, y: 0.215, w: 0.11, h: 0.055 }, // SET-UP
+  { tab: 5, x: 0.93, y: 0.215, w: 0.08, h: 0.055 }, // CASH
+];
+
+// item clickable rects (filled every render)
+let shopItemRects = [];
+
+
+// ===== POTION SHOP DATA =====
+const POTIONS = [
+  { id: "hp1", name: "Red Potion", type: "hp", heal: 50, price: 25, img: "./assets/ui/potions/hp1.png" },
+  { id: "hp2", name: "Orange Potion", type: "hp", heal: 150, price: 80, img: "./assets/ui/potions/hp2.png" },
+  { id: "hp3", name: "White Potion", type: "hp", heal: 300, price: 200, img: "./assets/ui/potions/hp3.png" },
+
+  { id: "mp1", name: "Blue Potion", type: "mp", heal: 100, price: 40, img: "./assets/ui/potions/mp1.png" },
+  { id: "mp2", name: "Mana Elixir", type: "mp", heal: 300, price: 120, img: "./assets/ui/potions/mp2.png" },
+  { id: "mp3", name: "Sorcerer Elixir", type: "mp", heal: 600, price: 350, img: "./assets/ui/potions/mp3.png" },
+];
+
+const potionImgs = {};
+for (const p of POTIONS) {
+  const im = new Image();
+  im.src = p.img;
+  potionImgs[p.id] = im;
+}
+
+
+
 function nowMs() { return performance.now(); }
 function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
 function randBetween(a, b) { return a + Math.random() * (b - a); }
@@ -168,13 +222,14 @@ function expNeededForLevel(lv) {
 
 function applyLevelStats() {
   // STR מעלה דמג'
-  player.damage = CONFIG.playerDamage + player.str * 1;
+  // STR raises damage: +1 damage per STR point
+  player.damage = CONFIG.playerDamage + (player.str || 0) * 1;
 
-  // VIT מעלה מקס HP
+  // VIT raises max HP: +6 HP per VIT point (changed from 3 -> 6)
   const oldMax = player.maxHP;
-  player.maxHP = CONFIG.playerMaxHP + player.vit * 3;
+  player.maxHP = CONFIG.playerMaxHP + (player.vit || 0) * 6;
 
-  // לא מוריד HP כשמקס עולה
+  // When max HP increases, heal proportionally up to the new max (do not reduce HP)
   if (player.maxHP > oldMax) {
     player.hp = Math.min(player.hp + (player.maxHP - oldMax), player.maxHP);
   } else {
@@ -221,6 +276,21 @@ function updateDamageTexts(dt) {
   }
 
   damageTexts = damageTexts.filter(d => d.life > 0);
+}
+
+function buyPotion(potionId) {
+  const p = POTIONS.find(x => x.id === potionId);
+  if (!p) return;
+
+  if (playerMesos < p.price) {
+    addError("Not enough Mesos!");
+    return;
+  }
+
+  playerMesos -= p.price;
+  inv[potionId] += 1;
+
+  addError(`Bought ${p.name}`);
 }
 
 
@@ -354,6 +424,17 @@ const playerFrames = new Map();
 // ===== MESOS (multi types + animated frames) =====
 let mesos = [];
 let playerMesos = 0;
+
+// ===== POTION INVENTORY =====
+const inv = {
+  hp1: 0,
+  hp2: 0,
+  hp3: 0,
+  mp1: 0,
+  mp2: 0,
+  mp3: 0,
+};
+
 
 const MESO_TYPES = [
   { name: "mesos1", min: 1, max: 49, frames: 4, w: 22, h: 22 },
@@ -912,6 +993,9 @@ async function completeQuest(quest) {
     }
     player.vy = 0;
     player.onGround = true;
+
+
+
   }
 
   await refreshNeededAssets();
@@ -1205,16 +1289,7 @@ function render() {
   // time once per frame
   const t = nowMs();
 
-  /*
-  // DEBUG: show platforms
-  ctx.fillStyle = "rgba(255,0,0,0.35)";
-  for (const p of WORLD.platforms) {
-    ctx.fillRect(p.x * scaleX, p.y * scaleY, p.w * scaleX, p.h * scaleY);
-  }
-    */
-
   // ===== PLAYER DRAW (image) =====
-  // choose anim (attack priority)
   let anim = "stand";
   if (t < player.animUntil) anim = player.anim;
   else if (!player.onGround) anim = "jump";
@@ -1222,7 +1297,6 @@ function render() {
 
   const pImg = getPlayerFrame(anim, t);
 
-  // align draw to hitbox feet (prevents "floating" visuals)
   const pbox = playerBox();
   const feetY = pbox.y + pbox.h;
   const drawY = feetY - player.h;
@@ -1252,32 +1326,50 @@ function render() {
   );
 
   // ===== EXP BAR (bottom-left) =====
-  const barW = 260 * scaleX;
-  const barH = 10 * scaleY;
-  const bx = 12 * scaleX;
-  const by = (ORIGINAL_HEIGHT - 20) * scaleY; // אם לא יושב למטה, תגיד לי ונשנה ל-canvas.height
+  const expBarW = 260 * scaleX;
+  const expBarH = 10 * scaleY;
+  const expBx = 12 * scaleX;
+  const expBy = (ORIGINAL_HEIGHT - 20) * scaleY;
 
   const ratio = player.expToNext > 0 ? (player.exp / player.expToNext) : 0;
 
   ctx.fillStyle = "rgba(0,0,0,0.45)";
-  ctx.fillRect(bx, by, barW, barH);
+  ctx.fillRect(expBx, expBy, expBarW, expBarH);
 
   ctx.fillStyle = "rgba(0,160,255,0.85)";
-  ctx.fillRect(bx, by, barW * clamp(ratio, 0, 1), barH);
+  ctx.fillRect(expBx, expBy, expBarW * clamp(ratio, 0, 1), expBarH);
 
   ctx.fillStyle = "white";
   ctx.font = `${14 * scaleY}px Arial`;
   ctx.fillText(
     `LV ${player.level}  EXP ${Math.floor(player.exp)}/${player.expToNext}`,
-    bx,
-    by - 4 * scaleY
+    expBx,
+    expBy - 4 * scaleY
   );
+
+  // ===== NPC DRAW =====
+  const npcScale = 0.65;
+
+  const baseW = shopNpc.w * scaleX;
+  const baseH = shopNpc.h * scaleY;
+
+  const nw = baseW * npcScale;
+  const nh = baseH * npcScale;
+
+  const nx = shopNpc.x * scaleX;
+  const ny = shopNpc.y * scaleY + (baseH - nh);
+
+  if (shopNpcImg.complete && shopNpcImg.naturalWidth > 0) {
+    ctx.drawImage(shopNpcImg, nx, ny, nw, nh);
+  } else {
+    ctx.fillStyle = "#00ccff";
+    ctx.fillRect(nx, ny, nw, nh);
+  }
 
   // ===== MOBS DRAW =====
   for (const m of mobs) {
     const img = getMobFrame(m.id, m.state, t);
 
-    // Check if this is a boss fight (map starts with 'b')
     const isBoss = currentMapName.startsWith("b");
     const scale = isBoss ? 5 : 1;
 
@@ -1286,7 +1378,6 @@ function render() {
     const mw = m.w * scaleX * scale;
     const mh = m.h * scaleY * scale;
 
-    // Center the boss sprite
     const offsetX = isBoss ? (mw - m.w * scaleX) / 2 : 0;
     const offsetY = isBoss ? (mh - m.h * scaleY) : 0;
 
@@ -1298,7 +1389,6 @@ function render() {
       ctx.fillRect(mx - offsetX, my - offsetY, mw, mh);
     }
 
-    // mob hp bar (scaled for boss)
     const hpBarY = (m.y - 15) * scaleY - (isBoss ? mh - m.h * scaleY : 0);
     const hpBarW = mw;
     const hpBarH = isBoss ? 10 * scaleY : 6 * scaleY;
@@ -1309,15 +1399,15 @@ function render() {
     ctx.fillRect(mx - offsetX, hpBarY, hpBarW * (m.hp / m.maxHP), hpBarH);
   }
 
-  // ✅ NEW: draw mesos here (so they appear)
+  // mesos
   drawMesos();
 
-  // ✅ NEW: show mesos count (debug/UI)
+  // mesos count (debug)
   ctx.fillStyle = "white";
   ctx.font = `${18 * scaleY}px Arial`;
   ctx.fillText(`Mesos: ${playerMesos}`, 12 * scaleX, 52 * scaleY);
 
-  // ===== DAMAGE TEXTS (image digits) =====
+  // ===== DAMAGE TEXTS =====
   for (const d of damageTexts) {
     const alpha = Math.max(d.life, 0);
     ctx.globalAlpha = alpha;
@@ -1329,11 +1419,11 @@ function render() {
 
     const totalW = valueStr.length * digitW;
     let drawX = d.x * scaleX - totalW / 2;
-    const drawY = d.y * scaleY;
+    const drawYY = d.y * scaleY;
 
     for (const ch of valueStr) {
       const img = dmgDigits[ch];
-      if (img) ctx.drawImage(img, drawX, drawY, digitW, digitH);
+      if (img) ctx.drawImage(img, drawX, drawYY, digitW, digitH);
       drawX += digitW;
     }
 
@@ -1341,8 +1431,97 @@ function render() {
   }
   ctx.textAlign = "start";
 
+  // ===== SHOP UI (ONLY IF OPEN) =====
+  if (shopOpen) {
+    const SHOP_SCALE = 0.55;        // קטן יותר (תשנה ל-0.5/0.6 לפי טעם)
+    const SHOP_ANCHOR = "rightMid"; // center / rightMid / rightBottom
+
+    const shopBaseW = 780 * scaleX;
+    const shopBaseH = 520 * scaleY;
+
+    const imgW = shopBaseW * SHOP_SCALE;
+    const imgH = shopBaseH * SHOP_SCALE;
+
+    let shopBx, shopBy;
+
+    if (SHOP_ANCHOR === "center") {
+      shopBx = canvas.width / 2 - imgW / 2;
+      shopBy = canvas.height / 2 - imgH / 2;
+    } else if (SHOP_ANCHOR === "rightBottom") {
+      shopBx = canvas.width - imgW - 20 * scaleX;
+      shopBy = canvas.height - imgH - 20 * scaleY;
+    } else { // rightMid
+      shopBx = canvas.width - imgW - 20 * scaleX;
+      shopBy = canvas.height / 2 - imgH / 2;
+    }
+
+    lastShopRect = { x: shopBx, y: shopBy, w: imgW, h: imgH };
+
+    const bg = shopUiImgs[shopTab];
+    if (bg && bg.complete && bg.naturalWidth > 0) {
+      ctx.drawImage(bg, shopBx, shopBy, imgW, imgH);
+    } else {
+      ctx.fillStyle = "rgba(0,0,0,0.7)";
+      ctx.fillRect(shopBx, shopBy, imgW, imgH);
+    }
+
+    shopItemRects = [];
+
+    // show potions list ONLY on USE tab (shop2)
+    if (shopTab === 2) {
+      const listX = shopBx + imgW * 0.08;
+      const listY = shopBy + imgH * 0.34;
+      const rowH = imgH * 0.09;
+
+      const items = [
+        ["1", "hp1"], ["2", "hp2"], ["3", "hp3"],
+        ["4", "mp1"], ["5", "mp2"], ["6", "mp3"],
+      ];
+
+      ctx.font = `${16 * scaleY}px Arial`;
+
+      for (let i = 0; i < items.length; i++) {
+        const id = items[i][1];
+        const p = POTIONS.find(x => x.id === id);
+        if (!p) continue;
+
+        const y = listY + i * rowH;
+
+        shopItemRects.push({
+          id,
+          x: listX,
+          y: y - rowH * 0.65,
+          w: imgW * 0.84,
+          h: rowH * 0.9,
+        });
+
+        const icon = potionImgs[id];
+        const iw = 26 * scaleX, ih = 26 * scaleY;
+        if (icon && icon.complete && icon.naturalWidth > 0) {
+          ctx.drawImage(icon, listX, y - ih * 0.7, iw, ih);
+        }
+
+        const owned = inv[id] ?? 0;
+
+        ctx.fillStyle = "white";
+        ctx.fillText(`${p.name}`, listX + 40 * scaleX, y);
+
+        ctx.fillStyle = "rgba(255,255,255,0.75)";
+        ctx.fillText(`+${p.heal} ${p.type.toUpperCase()}`, listX + 260 * scaleX, y);
+
+        ctx.fillStyle = "rgba(255,215,0,0.95)";
+        ctx.fillText(`${p.price}`, listX + 460 * scaleX, y);
+
+        ctx.fillStyle = "rgba(255,255,255,0.65)";
+        ctx.fillText(`x${owned}`, listX + 540 * scaleX, y);
+      }
+    }
+  }
+
+  // quest UI always last
   renderQuestUI();
 }
+
 
 
 
@@ -1373,8 +1552,75 @@ window.addEventListener("keydown", (e) => {
   if (e.code === "Space") tryAttack();
   if (e.code === "KeyI") toggleInv();
 
+  // ===== SHOP SYSTEM =====
+
+  if (e.code === "KeyE") {
+    if (intersects(player, shopNpc)) {
+      shopOpen = !shopOpen;
+      if (shopOpen) shopTab = 1;
+    }
+  }
+
+
+  // Buy potions when shop is open
+  if (shopOpen) {
+    if (e.code === "Digit1") buyPotion("hp1");
+    if (e.code === "Digit2") buyPotion("hp2");
+    if (e.code === "Digit3") buyPotion("hp3");
+
+    if (e.code === "Digit4") buyPotion("mp1");
+    if (e.code === "Digit5") buyPotion("mp2");
+    if (e.code === "Digit6") buyPotion("mp3");
+
+    if (e.code === "Escape") shopOpen = false;
+  }
 });
+
 window.addEventListener("keyup", (e) => keys.delete(e.code));
+
+canvas.addEventListener("mousedown", (e) => {
+  if (!shopOpen || !lastShopRect) return;
+
+  const r = canvas.getBoundingClientRect();
+  const mx = (e.clientX - r.left) * (canvas.width / r.width);
+  const my = (e.clientY - r.top) * (canvas.height / r.height);
+
+  // Click outside shop => close
+  if (
+    mx < lastShopRect.x || mx > lastShopRect.x + lastShopRect.w ||
+    my < lastShopRect.y || my > lastShopRect.y + lastShopRect.h
+  ) {
+    shopOpen = false;
+    return;
+  }
+
+  // 1) Tabs switching (click top buttons)
+  for (const hb of SHOP_TAB_HITBOX) {
+    const x = lastShopRect.x + lastShopRect.w * hb.x;
+    const y = lastShopRect.y + lastShopRect.h * hb.y;
+    const w = lastShopRect.w * hb.w;
+    const h = lastShopRect.h * hb.h;
+
+    if (mx >= x && mx <= x + w && my >= y && my <= y + h) {
+      shopTab = hb.tab;
+      return;
+    }
+  }
+
+  // 2) Buy potion by clicking a row (only in USE tab)
+  if (shopTab === 2) {
+    for (const it of shopItemRects) {
+      if (
+        mx >= it.x && mx <= it.x + it.w &&
+        my >= it.y && my <= it.y + it.h
+      ) {
+        buyPotion(it.id);
+        return;
+      }
+    }
+  }
+});
+
 
 async function boot() {
   const statsList = await fetchJsonFirstOk([
@@ -1397,6 +1643,10 @@ async function boot() {
   if (questState.activeQuestId) {
     await loadMapForQuest(questState.activeQuestId);
   }
+  // === PLACE NPC AFTER MAP LOAD ===
+  shopNpc.y = WORLD.groundY - shopNpc.h - 20;
+
+
 
   // place player on third platform (not flying)
   // Feet should be at platform.y, so: player.y + offsetY + hitbox.h = platform.y
