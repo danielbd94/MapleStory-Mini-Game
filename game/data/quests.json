@@ -4,20 +4,266 @@
       "bgPath": "./assets/maps/farm.png",
       "groundY": 465,
       "platforms": [
-        { "x": 0, "y": 465, "w": 960, "h": 75 },
-        { "x": 238, "y": 215, "w": 485, "h": 18 },
-        { "x": 199, "y": 293, "w": 560, "h": 18 },
-        { "x": 160, "y": 370, "w": 638, "h": 18 }
+        {
+          "x": 0,
+          "y": 465,
+          "w": 960,
+          "h": 75
+        },
+        {
+          "x": 238,
+          "y": 215,
+          "w": 485,
+          "h": 18
+        },
+        {
+          "x": 199,
+          "y": 293,
+          "w": 560,
+          "h": 18
+        },
+        {
+          "x": 160,
+          "y": 370,
+          "w": 638,
+          "h": 18
+        }
       ]
     },
     "b1map": {
       "bgPath": "./assets/maps/b1map.png",
       "groundY": 480,
       "platforms": [
-        { "x": 35, "y": 480, "w": 925, "h": 105 },
-        { "x": 290, "y": 105, "w": 330, "h": 18 },
-        { "x": 255, "y": 190, "w": 400, "h": 18 },
-        { "x": 160, "y": 290, "w": 600, "h": 18 }
+        {
+          "x": 35,
+          "y": 480,
+          "w": 925,
+          "h": 105
+        },
+        {
+          "x": 290,
+          "y": 105,
+          "w": 330,
+          "h": 18
+        },
+        {
+          "x": 255,
+          "y": 190,
+          "w": 400,
+          "h": 18
+        },
+        {
+          "x": 160,
+          "y": 290,
+          "w": 600,
+          "h": 18
+        }
+      ]
+    },
+    "ellinia": {
+      "bgPath": "./assets/maps/Elinia1.png",
+      "groundY": 520,
+      "platforms": [
+        {
+          "x": 0,
+          "y": 510,
+          "w": 960,
+          "h": 40
+        },
+        {
+          "x": 57,
+          "y": 400,
+          "w": 380,
+          "h": 18
+        },
+        {
+          "x": 520,
+          "y": 400,
+          "w": 382,
+          "h": 18
+        },
+        {
+          "x": 57,
+          "y": 324,
+          "w": 380,
+          "h": 18
+        },
+        {
+          "x": 520,
+          "y": 324,
+          "w": 380,
+          "h": 18
+        },
+        {
+          "x": 57,
+          "y": 246,
+          "w": 380,
+          "h": 18
+        },
+        {
+          "x": 520,
+          "y": 246,
+          "w": 380,
+          "h": 18
+        },
+        {
+          "x": 262,
+          "y": 146,
+          "w": 73,
+          "h": 18
+        },
+        {
+          "x": 364,
+          "y": 146,
+          "w": 73,
+          "h": 18
+        },
+        {
+          "x": 469,
+          "y": 146,
+          "w": 73,
+          "h": 18
+        },
+        {
+          "x": 573,
+          "y": 146,
+          "w": 73,
+          "h": 18
+        },
+        {
+          "x": 210,
+          "y": 119,
+          "w": 73,
+          "h": 18
+        },
+        {
+          "x": 314,
+          "y": 119,
+          "w": 73,
+          "h": 18
+        },
+        {
+          "x": 418,
+          "y": 119,
+          "w": 73,
+          "h": 18
+        },
+        {
+          "x": 520,
+          "y": 119,
+          "w": 73,
+          "h": 18
+        }
+      ]
+    },
+    "b2map": {
+      "bgPath": "./assets/maps/b2map.png",
+      "groundY": 520,
+      "platforms": [
+        {
+          "x": 0,
+          "y": 520,
+          "w": 960,
+          "h": 40
+        },
+        {
+          "x": 270,
+          "y": 120,
+          "w": 420,
+          "h": 18
+        },
+        {
+          "x": 270,
+          "y": 205,
+          "w": 420,
+          "h": 18
+        },
+        {
+          "x": 270,
+          "y": 290,
+          "w": 420,
+          "h": 18
+        },
+        {
+          "x": 270,
+          "y": 375,
+          "w": 420,
+          "h": 18
+        }
+      ]
+    },
+    "perion": {
+      "bgPath": "./assets/maps/perion1.png",
+      "groundY": 430,
+      "mobScale": 3,
+      "platforms": [
+        {
+          "x": 0,
+          "y": 430,
+          "w": 960,
+          "h": 80
+        },
+        {
+          "x": 210,
+          "y": 394,
+          "w": 43,
+          "h": 18
+        },
+        {
+          "x": 285,
+          "y": 334,
+          "w": 383,
+          "h": 18
+        },
+        {
+          "x": 665,
+          "y": 364,
+          "w": 40,
+          "h": 18
+        },
+        {
+          "x": 65,
+          "y": 276,
+          "w": 158,
+          "h": 18
+        },
+        {
+          "x": 730,
+          "y": 247,
+          "w": 226,
+          "h": 18
+        }
+      ]
+    },
+    "b3map": {
+      "bgPath": "./assets/maps/b3map.png",
+      "groundY": 450,
+      "platforms": [
+        {
+          "x": 0,
+          "y": 450,
+          "w": 960,
+          "h": 80
+        },
+         {
+          "x":296,
+          "y": 355,
+          "w": 80,
+          "h": 18
+        },
+        {
+          "x": 63,
+          "y": 142,
+          "w": 600,
+          "h": 18
+        },
+        {
+          "x": 122,
+          "y": 260,
+          "w": 424,
+          "h": 18
+        }
+        
       ]
     }
   },
@@ -27,91 +273,567 @@
       "map": "farm",
       "title": "Snail Trouble",
       "description": "Kill 6 Snails",
-      "requirements": [{ "type": "kill", "mobId": 100100, "count": 3 }],
-      "rewards": { "exp": 10 },
-      "unlocks": ["q2"]
+      "requirements": [
+        {
+          "type": "kill",
+          "mobId": 100100,
+          "count": 3
+        }
+      ],
+      "rewards": {
+        "exp": 10
+      },
+      "unlocks": [
+        "q2"
+      ]
     },
     {
       "id": "q2",
       "map": "farm",
       "title": "Blue Invasion",
       "description": "Kill 6 Blue Snails",
-      "requirements": [{ "type": "kill", "mobId": 100101, "count": 6 }],
-      "rewards": { "exp": 20 },
-      "unlocks": ["q3"]
+      "requirements": [
+        {
+          "type": "kill",
+          "mobId": 100101,
+          "count": 6
+        }
+      ],
+      "rewards": {
+        "exp": 20
+      },
+      "unlocks": [
+        "q3"
+      ]
     },
     {
       "id": "q3",
       "map": "farm",
       "title": "Red Shell Menace",
       "description": "Kill 8 Red Snails",
-      "requirements": [{ "type": "kill", "mobId": 130101, "count": 8 }],
-      "rewards": { "exp": 35 },
-      "unlocks": ["q4"]
+      "requirements": [
+        {
+          "type": "kill",
+          "mobId": 130101,
+          "count": 8
+        }
+      ],
+      "rewards": {
+        "exp": 35
+      },
+      "unlocks": [
+        "q4"
+      ]
     },
     {
       "id": "q4",
       "map": "farm",
       "title": "Shroom Forest",
       "description": "Kill 8 Shrooms",
-      "requirements": [{ "type": "kill", "mobId": 120100, "count": 8 }],
-      "rewards": { "exp": 55 },
-      "unlocks": ["q5"]
+      "requirements": [
+        {
+          "type": "kill",
+          "mobId": 120100,
+          "count": 8
+        }
+      ],
+      "rewards": {
+        "exp": 55
+      },
+      "unlocks": [
+        "q5"
+      ]
     },
     {
       "id": "q5",
       "map": "farm",
       "title": "Orange Threat",
       "description": "Kill 10 Orange Mushrooms",
-      "requirements": [{ "type": "kill", "mobId": 1210102, "count": 10 }],
-      "rewards": { "exp": 80 },
-      "unlocks": ["q6"]
+      "requirements": [
+        {
+          "type": "kill",
+          "mobId": 1210102,
+          "count": 10
+        }
+      ],
+      "rewards": {
+        "exp": 80
+      },
+      "unlocks": [
+        "q6"
+      ]
     },
     {
       "id": "q6",
       "map": "farm",
       "title": "Green Swarm",
       "description": "Kill 10 Green Mushrooms",
-      "requirements": [{ "type": "kill", "mobId": 1110100, "count": 10 }],
-      "rewards": { "exp": 115 },
-      "unlocks": ["q7"]
+      "requirements": [
+        {
+          "type": "kill",
+          "mobId": 1110100,
+          "count": 10
+        }
+      ],
+      "rewards": {
+        "exp": 115
+      },
+      "unlocks": [
+        "q7"
+      ]
     },
     {
       "id": "q7",
       "map": "farm",
       "title": "Sticky Situation",
       "description": "Kill 12 Slimes",
-      "requirements": [{ "type": "kill", "mobId": 210100, "count": 12 }],
-      "rewards": { "exp": 160 },
-      "unlocks": ["q8"]
+      "requirements": [
+        {
+          "type": "kill",
+          "mobId": 210100,
+          "count": 12
+        }
+      ],
+      "rewards": {
+        "exp": 160
+      },
+      "unlocks": [
+        "q8"
+      ]
     },
     {
       "id": "q8",
       "map": "farm",
       "title": "Forest Spirits",
       "description": "Kill 12 Stumps",
-      "requirements": [{ "type": "kill", "mobId": 130100, "count": 12 }],
-      "rewards": { "exp": 220 },
-      "unlocks": ["q9"]
+      "requirements": [
+        {
+          "type": "kill",
+          "mobId": 130100,
+          "count": 12
+        }
+      ],
+      "rewards": {
+        "exp": 220
+      },
+      "unlocks": [
+        "q9"
+      ]
     },
     {
       "id": "q9",
       "map": "farm",
       "title": "Pig Hunt",
       "description": "Kill 10 Ribbon Pigs",
-      "requirements": [{ "type": "kill", "mobId": 1210101, "count": 15 }],
-      "rewards": { "exp": 300 },
-      "unlocks": ["qBoss1"]
+      "requirements": [
+        {
+          "type": "kill",
+          "mobId": 1210101,
+          "count": 15
+        }
+      ],
+      "rewards": {
+        "exp": 300
+      },
+      "unlocks": [
+        "qBoss1"
+      ]
     },
     {
       "id": "qBoss1",
       "map": "b1map",
       "title": "Mushroom King",
       "description": "Defeat the Giant Orange Mushroom",
-      "requirements": [{ "type": "kill", "mobId": 6130101, "count": 1 }],
-      "rewards": { "exp": 1200 },
+      "requirements": [
+        {
+          "type": "kill",
+          "mobId": 6130101,
+          "count": 1
+        }
+      ],
+      "rewards": {
+        "exp": 1200
+      },
+      "unlocks": [
+        "q11"
+      ]
+    },
+    {
+      "id": "q11",
+      "map": "ellinia",
+      "title": "Green Goo",
+      "description": "Kill 12 Slimes",
+      "requirements": [
+        {
+          "type": "kill",
+          "mobId": 210100,
+          "count": 12
+        }
+      ],
+      "rewards": {
+        "exp": 140
+      },
+      "unlocks": [
+        "q12"
+      ]
+    },
+    {
+      "id": "q12",
+      "map": "ellinia",
+      "title": "Bubble Pop",
+      "description": "Kill 10 Bubblings",
+      "requirements": [
+        {
+          "type": "kill",
+          "mobId": 130100,
+          "count": 10
+        }
+      ],
+      "rewards": {
+        "exp": 190
+      },
+      "unlocks": [
+        "q13"
+      ]
+    },
+    {
+      "id": "q13",
+      "map": "ellinia",
+      "title": "Forest Spirits",
+      "description": "Kill 8 Fairies",
+      "requirements": [
+        {
+          "type": "kill",
+          "mobId": 1110101,
+          "count": 8
+        }
+      ],
+      "rewards": {
+        "exp": 230
+      },
+      "unlocks": [
+        "q14"
+      ]
+    },
+    {
+      "id": "q14",
+      "map": "ellinia",
+      "title": "Dark Roots",
+      "description": "Kill 10 Dark Stumps",
+      "requirements": [
+        {
+          "type": "kill",
+          "mobId": 1130100,
+          "count": 10
+        }
+      ],
+      "rewards": {
+        "exp": 300
+      },
+      "unlocks": [
+        "q15"
+      ]
+    },
+    {
+      "id": "q15",
+      "map": "ellinia",
+      "title": "Eyes in the Trees",
+      "description": "Kill 10 Evil Eyes",
+      "requirements": [
+        {
+          "type": "kill",
+          "mobId": 2110200,
+          "count": 10
+        }
+      ],
+      "rewards": {
+        "exp": 340
+      },
+      "unlocks": [
+        "q16"
+      ]
+    },
+    {
+      "id": "q16",
+      "map": "ellinia",
+      "title": "Cursed Watchers",
+      "description": "Kill 10 Curse Eyes",
+      "requirements": [
+        {
+          "type": "kill",
+          "mobId": 2230100,
+          "count": 10
+        }
+      ],
+      "rewards": {
+        "exp": 420
+      },
+      "unlocks": [
+        "q17"
+      ]
+    },
+    {
+      "id": "q17",
+      "map": "ellinia",
+      "title": "Cold Stare",
+      "description": "Kill 8 Cold Eyes",
+      "requirements": [
+        {
+          "type": "kill",
+          "mobId": 3230100,
+          "count": 8
+        }
+      ],
+      "rewards": {
+        "exp": 520
+      },
+      "unlocks": [
+        "q18"
+      ]
+    },
+    {
+      "id": "q18",
+      "map": "ellinia",
+      "title": "Monkey Mayhem",
+      "description": "Kill 8 Lupins",
+      "requirements": [
+        {
+          "type": "kill",
+          "mobId": 3210800,
+          "count": 8
+        }
+      ],
+      "rewards": {
+        "exp": 700
+      },
+      "unlocks": [
+        "q19"
+      ]
+    },
+    {
+      "id": "q19",
+      "map": "ellinia",
+      "title": "Undead Monkeys",
+      "description": "Kill 6 Zombie Lupins",
+      "requirements": [
+        {
+          "type": "kill",
+          "mobId": 4230101,
+          "count": 6
+        }
+      ],
+      "rewards": {
+        "exp": 1100
+      },
+      "unlocks": [
+        "qBoss2"
+      ]
+    },
+    {
+      "id": "qBoss2",
+      "map": "b2map",
+      "title": "Stumpy",
+      "description": "Defeat the Tree Boss",
+      "requirements": [
+        {
+          "type": "kill",
+          "mobId": 5220002,
+          "count": 1
+        }
+      ],
+      "rewards": {
+        "exp": 2500
+      },
+      "unlocks": [
+        "q21"
+      ]
+    },
+    {
+      "id": "q21",
+      "map": "perion",
+      "title": "Rocky Beginnings",
+      "description": "Kill 8 mobs in Perion (1110101)",
+      "requirements": [
+        {
+          "type": "kill",
+          "mobId": 1110101,
+          "count": 8
+        }
+      ],
+      "rewards": {
+        "exp": 1200
+      },
+      "unlocks": [
+        "q22"
+      ]
+    },
+    {
+      "id": "q22",
+      "map": "perion",
+      "title": "Training Grounds",
+      "description": "Kill 10 mobs in Perion (1130100)",
+      "requirements": [
+        {
+          "type": "kill",
+          "mobId": 1130100,
+          "count": 10
+        }
+      ],
+      "rewards": {
+        "exp": 1400
+      },
+      "unlocks": [
+        "q23"
+      ]
+    },
+    {
+      "id": "q23",
+      "map": "perion",
+      "title": "Desert Threat",
+      "description": "Kill 12 mobs in Perion (1140100)",
+      "requirements": [
+        {
+          "type": "kill",
+          "mobId": 1140100,
+          "count": 12
+        }
+      ],
+      "rewards": {
+        "exp": 1600
+      },
+      "unlocks": [
+        "q24"
+      ]
+    },
+    {
+      "id": "q24",
+      "map": "perion",
+      "title": "Perion Patrol",
+      "description": "Kill 12 mobs in Perion (2130100)",
+      "requirements": [
+        {
+          "type": "kill",
+          "mobId": 2130100,
+          "count": 12
+        }
+      ],
+      "rewards": {
+        "exp": 1800
+      },
+      "unlocks": [
+        "q25"
+      ]
+    },
+    {
+      "id": "q25",
+      "map": "perion",
+      "title": "Stone Raiders",
+      "description": "Kill 14 mobs in Perion (2230110)",
+      "requirements": [
+        {
+          "type": "kill",
+          "mobId": 2230110,
+          "count": 14
+        }
+      ],
+      "rewards": {
+        "exp": 2000
+      },
+      "unlocks": [
+        "q26"
+      ]
+    },
+    {
+      "id": "q26",
+      "map": "perion",
+      "title": "Canyon Sweep",
+      "description": "Kill 14 mobs in Perion (2230111)",
+      "requirements": [
+        {
+          "type": "kill",
+          "mobId": 2230111,
+          "count": 14
+        }
+      ],
+      "rewards": {
+        "exp": 2200
+      },
+      "unlocks": [
+        "q27"
+      ]
+    },
+    {
+      "id": "q27",
+      "map": "perion",
+      "title": "Rocky Ambush",
+      "description": "Kill 16 mobs in Perion (2230102)",
+      "requirements": [
+        {
+          "type": "kill",
+          "mobId": 2230102,
+          "count": 16
+        }
+      ],
+      "rewards": {
+        "exp": 2400
+      },
+      "unlocks": [
+        "q28"
+      ]
+    },
+    {
+      "id": "q28",
+      "map": "perion",
+      "title": "Warrior's Trial",
+      "description": "Kill 16 mobs in Perion (3210100)",
+      "requirements": [
+        {
+          "type": "kill",
+          "mobId": 3210100,
+          "count": 16
+        }
+      ],
+      "rewards": {
+        "exp": 2600
+      },
+      "unlocks": [
+        "q29"
+      ]
+    },
+    {
+      "id": "q29",
+      "map": "perion",
+      "title": "Final Perion Hunt",
+      "description": "Kill 1 elite mob in Perion (4230400)",
+      "requirements": [
+        {
+          "type": "kill",
+          "mobId": 4230400,
+          "count": 1
+        }
+      ],
+      "rewards": {
+        "exp": 3200
+      },
+      "unlocks": ["qBoss3"]
+    },
+    {
+      "id": "qBoss3",
+      "map": "b3map",
+      "title": "Ancient Guardian",
+      "description": "Defeat the Ancient Boss",
+      "requirements": [
+        {
+          "type": "kill",
+          "mobId": 3220000,
+          "count": 1
+        }
+      ],
+      "rewards": {
+        "exp": 5000
+      },
       "unlocks": []
     }
   ],
-  "startQuestId": "q1"
+  "startQuestId": "qBoss3"
 }

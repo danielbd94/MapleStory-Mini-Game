@@ -53,8 +53,8 @@ const CONFIG = {
   gravity: 1600,
   jumpVel: 620,
 
-  spawnMaxOnScreen: 6,
-  spawnIntervalMs: 900,
+  spawnMaxOnScreen: 20,
+  spawnIntervalMs: 350,
 
   mobBaseSpeedPxPerSec: 40,
   mobWanderSwitchMsMin: 800,
@@ -1258,17 +1258,61 @@ function spawnLogic() {
     const groundPlatform = WORLD.platforms[0]; // ground platform
     const x = groundPlatform.x + 100 + Math.random() * (groundPlatform.w - 200);
     mobs.push(spawnMob(id, x, groundPlatform));
-  } else {
-    // Normal quest spawning
-    if (aliveCount >= CONFIG.spawnMaxOnScreen) return;
+  } else
 
-    const id = targets[0];
-    const plats = WORLD.platforms.slice(1);
-    const p = plats[Math.floor(Math.random() * plats.length)];
-    const x = p.x + 10 + Math.random() * (p.w - 80);
+    // For qBoss quests, only allow 1 mob and spawn at ground platform
+    if (questState.activeQuestId && questState.activeQuestId.startsWith("qBoss")) {
+      if (aliveCount >= 1) return;
 
-    mobs.push(spawnMob(id, x, p));
+      const id = targets[0];
+      const groundPlatform = WORLD.platforms[0]; // ground platform
+      const x = groundPlatform.x + 100 + Math.random() * (groundPlatform.w - 200);
+      mobs.push(spawnMob(id, x, groundPlatform));
+    } else {
+      if (aliveCount >= CONFIG.spawnMaxOnScreen) return;
+
+      const id = targets[0];
+      const plats = WORLD.platforms.slice(1);
+
+      const p = pickPlatformWeighted(plats);
+
+      // קצרה? רק אם אין עליה אף אחד
+      if (isShortPlatform(p) && countAliveOnPlatform(p) >= 1) return;
+
+      // ארוכה? תן שיהיו עליה הרבה
+      if (!isShortPlatform(p) && countAliveOnPlatform(p) >= 6) return;
+
+      const x = p.x + 20 + Math.random() * (p.w - 60);
+      mobs.push(spawnMob(id, x, p));
+
+    }
+
+}
+
+function isShortPlatform(p) {
+  return p.w <= 220; // קצרה = עד 220px (תכוון אם צריך)
+}
+
+function pickPlatformWeighted(plats) {
+  // ארוכות יקבלו משקל גדול יותר
+  const weights = plats.map(p => {
+    const base = Math.max(1, Math.floor(p.w / 120)); // רוחב גדול => יותר משקל
+    const shortPenalty = isShortPlatform(p) ? 0.25 : 1; // קצרות פי 4 פחות
+    return base * shortPenalty;
+  });
+
+  const total = weights.reduce((a, b) => a + b, 0);
+  let r = Math.random() * total;
+
+  for (let i = 0; i < plats.length; i++) {
+    r -= weights[i];
+    if (r <= 0) return plats[i];
   }
+  return plats[plats.length - 1];
+}
+
+function countAliveOnPlatform(p) {
+  return mobs.filter(m => !m.dead && m.platform === p).length;
 }
 
 function drawFlipped(img, x, y, w, h) {
@@ -1285,7 +1329,17 @@ function render() {
   if (mapBgImg) {
     ctx.drawImage(mapBgImg, 0, 0, canvas.width, canvas.height);
   }
-
+ /*// ===== DEBUG: SHOW PLATFORMS =====
+   ctx.fillStyle = "rgba(255,0,0,0.35)";
+   for (const p of WORLD.platforms) {
+     ctx.fillRect(
+       p.x * scaleX,
+       p.y * scaleY,
+       p.w * scaleX,
+       p.h * scaleY
+     );
+   }
+ */
   // time once per frame
   const t = nowMs();
 
@@ -1371,7 +1425,18 @@ function render() {
     const img = getMobFrame(m.id, m.state, t);
 
     const isBoss = currentMapName.startsWith("b");
-    const scale = isBoss ? 5 : 1;
+
+    // הגדלה רק למפות Ellinia
+    const isEllinia = currentMapName === "ellinia";
+
+    let scale = 1;
+
+    if (isBoss) {
+      scale = 5;
+    } else if (isEllinia) {
+      scale = 1.4; // תגדיל כמה שאתה רוצה
+    }
+
 
     const mx = m.x * scaleX;
     const my = m.y * scaleY;
