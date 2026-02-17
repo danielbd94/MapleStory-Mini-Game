@@ -178,24 +178,45 @@ for (let i = 1; i <= 5; i++) {
 let lastShopRect = null;
 
 // clickable zones inside the shop image (normalized 0..1)
-// we'll fine-tune later if needed
 const SHOP_TAB_HITBOX = [
-  { tab: 1, x: 0.52, y: 0.215, w: 0.12, h: 0.055 }, // EQUIP
-  { tab: 2, x: 0.64, y: 0.215, w: 0.10, h: 0.055 }, // USE
-  { tab: 3, x: 0.74, y: 0.215, w: 0.10, h: 0.055 }, // ETC
-  { tab: 4, x: 0.84, y: 0.215, w: 0.11, h: 0.055 }, // SET-UP
-  { tab: 5, x: 0.93, y: 0.215, w: 0.08, h: 0.055 }, // CASH
+  { tab: 1, x: 0.530, y: 0.240, w: 0.080, h: 0.065 }, // EQUIP
+  { tab: 2, x: 0.615, y: 0.240, w: 0.075, h: 0.065 }, // USE
+  { tab: 3, x: 0.695, y: 0.240, w: 0.065, h: 0.065 }, // ETC
+  { tab: 4, x: 0.765, y: 0.240, w: 0.080, h: 0.065 }, // SET-UP
+  { tab: 5, x: 0.850, y: 0.240, w: 0.075, h: 0.065 }, // CASH
 ];
 
 // item clickable rects (filled every render)
 let shopItemRects = [];
 
+// mouse hover tracking for shop tooltip
+let shopMouseX = 0, shopMouseY = 0;
+let shopHoverId = null;
+
+canvas.addEventListener("mousemove", (e) => {
+  const r = canvas.getBoundingClientRect();
+  shopMouseX = (e.clientX - r.left) * (canvas.width / r.width);
+  shopMouseY = (e.clientY - r.top) * (canvas.height / r.height);
+
+  // detect which shop item row is hovered
+  shopHoverId = null;
+  if (shopOpen && shopTab === 2) {
+    for (const it of shopItemRects) {
+      if (shopMouseX >= it.x && shopMouseX <= it.x + it.w &&
+          shopMouseY >= it.y && shopMouseY <= it.y + it.h) {
+        shopHoverId = it.id;
+        break;
+      }
+    }
+  }
+});
+
 
 // ===== POTION SHOP DATA =====
 const POTIONS = [
-  { id: "hp1", name: "Red Potion", type: "hp", heal: 50, price: 25, img: "./assets/ui/potions/hp1.png" },
+  { id: "hp1", name: "Red Potion", type: "hp", heal: 50, price: 25, img: "./assets/ui/potions/hp3.png" },
   { id: "hp2", name: "Orange Potion", type: "hp", heal: 150, price: 80, img: "./assets/ui/potions/hp2.png" },
-  { id: "hp3", name: "White Potion", type: "hp", heal: 300, price: 200, img: "./assets/ui/potions/hp3.png" },
+  { id: "hp3", name: "White Potion", type: "hp", heal: 300, price: 200, img: "./assets/ui/potions/hp1.png" },
 
   { id: "mp1", name: "Blue Potion", type: "mp", heal: 100, price: 40, img: "./assets/ui/potions/mp1.png" },
   { id: "mp2", name: "Mana Elixir", type: "mp", heal: 300, price: 120, img: "./assets/ui/potions/mp2.png" },
@@ -950,6 +971,8 @@ async function loadMapForQuest(questId) {
   WORLD = {
     groundY: mapDef.groundY,
     platforms: mapDef.platforms,
+    npcX: mapDef.npcX ?? 745,
+    npcY: mapDef.npcY ?? null,
   };
 
   // Store the current map name for boss detection
@@ -959,6 +982,10 @@ async function loadMapForQuest(questId) {
   const bg = await loadImage(PATHS.mapBg);
   if (bg.ok) mapBgImg = bg.img;
   else addError("Failed to load map: " + PATHS.mapBg);
+
+  // Reposition NPC for this map
+  shopNpc.x = WORLD.npcX ?? 745;
+  shopNpc.y = WORLD.npcY ?? (WORLD.groundY - shopNpc.h - 20);
 }
 
 async function completeQuest(quest) {
@@ -1329,7 +1356,7 @@ function render() {
   if (mapBgImg) {
     ctx.drawImage(mapBgImg, 0, 0, canvas.width, canvas.height);
   }
- /*// ===== DEBUG: SHOW PLATFORMS =====
+ // ===== DEBUG: SHOW PLATFORMS =====
    ctx.fillStyle = "rgba(255,0,0,0.35)";
    for (const p of WORLD.platforms) {
      ctx.fillRect(
@@ -1339,7 +1366,7 @@ function render() {
        p.h * scaleY
      );
    }
- */
+ 
   // time once per frame
   const t = nowMs();
 
@@ -1426,16 +1453,7 @@ function render() {
 
     const isBoss = currentMapName.startsWith("b");
 
-    // הגדלה רק למפות Ellinia
-    const isEllinia = currentMapName === "ellinia";
-
-    let scale = 1;
-
-    if (isBoss) {
-      scale = 5;
-    } else if (isEllinia) {
-      scale = 1.4; // תגדיל כמה שאתה רוצה
-    }
+    let scale = isBoss ? 5 : 1.4;
 
 
     const mx = m.x * scaleX;
@@ -1444,7 +1462,7 @@ function render() {
     const mh = m.h * scaleY * scale;
 
     const offsetX = isBoss ? (mw - m.w * scaleX) / 2 : 0;
-    const offsetY = isBoss ? (mh - m.h * scaleY) : 0;
+    const offsetY = mh - m.h * scaleY;
 
     if (img) {
       if (m.dir === 1) drawFlipped(img, mx - offsetX, my - offsetY, mw, mh);
@@ -1454,7 +1472,7 @@ function render() {
       ctx.fillRect(mx - offsetX, my - offsetY, mw, mh);
     }
 
-    const hpBarY = (m.y - 15) * scaleY - (isBoss ? mh - m.h * scaleY : 0);
+    const hpBarY = (m.y - 15) * scaleY - (mh - m.h * scaleY);
     const hpBarW = mw;
     const hpBarH = isBoss ? 10 * scaleY : 6 * scaleY;
 
@@ -1467,10 +1485,10 @@ function render() {
   // mesos
   drawMesos();
 
-  // mesos count (debug)
-  ctx.fillStyle = "white";
-  ctx.font = `${18 * scaleY}px Arial`;
-  ctx.fillText(`Mesos: ${playerMesos}`, 12 * scaleX, 52 * scaleY);
+  // mesos count (removed from top-left)
+  // ctx.fillStyle = "white";
+  // ctx.font = `${18 * scaleY}px Arial`;
+  // ctx.fillText(`Mesos: ${playerMesos}`, 12 * scaleX, 52 * scaleY);
 
   // ===== DAMAGE TEXTS =====
   for (const d of damageTexts) {
@@ -1499,7 +1517,7 @@ function render() {
   // ===== SHOP UI (ONLY IF OPEN) =====
   if (shopOpen) {
     const SHOP_SCALE = 0.55;        // קטן יותר (תשנה ל-0.5/0.6 לפי טעם)
-    const SHOP_ANCHOR = "rightMid"; // center / rightMid / rightBottom
+    const SHOP_ANCHOR = "center"; // center / rightMid / rightBottom
 
     const shopBaseW = 780 * scaleX;
     const shopBaseH = 520 * scaleY;
@@ -1530,55 +1548,98 @@ function render() {
       ctx.fillRect(shopBx, shopBy, imgW, imgH);
     }
 
+    // DEBUG: draw tab hitboxes as colored rectangles
+    // for (const hb of SHOP_TAB_HITBOX) {
+    //   const dx = shopBx + imgW * hb.x;
+    //   const dy = shopBy + imgH * hb.y;
+    //   const dw = imgW * hb.w;
+    //   const dh = imgH * hb.h;
+    //   ctx.strokeStyle = hb.tab === shopTab ? "lime" : "red";
+    //   ctx.lineWidth = 2;
+    //   ctx.strokeRect(dx, dy, dw, dh);
+    // }
+
     shopItemRects = [];
 
     // show potions list ONLY on USE tab (shop2)
     if (shopTab === 2) {
-      const listX = shopBx + imgW * 0.08;
-      const listY = shopBy + imgH * 0.34;
-      const rowH = imgH * 0.09;
+      // All positions proportional to shop image dimensions
+      const contentL = shopBx + imgW * 0.07;   // left edge of content area
+      const listY    = shopBy + imgH * 0.31;    // first row top
+      const rowH     = imgH * 0.062;            // row height (fits ~10 rows)
 
       const items = [
         ["1", "hp1"], ["2", "hp2"], ["3", "hp3"],
         ["4", "mp1"], ["5", "mp2"], ["6", "mp3"],
       ];
 
-      ctx.font = `${16 * scaleY}px Arial`;
+      const fontSize = Math.max(9, Math.round(rowH * 0.52));
+      ctx.font = `bold ${fontSize}px Arial`;
 
       for (let i = 0; i < items.length; i++) {
         const id = items[i][1];
         const p = POTIONS.find(x => x.id === id);
         if (!p) continue;
 
-        const y = listY + i * rowH;
+        const rowY  = listY + i * rowH;
+        const textY = rowY + rowH * 0.65;       // vertically center text
 
         shopItemRects.push({
           id,
-          x: listX,
-          y: y - rowH * 0.65,
-          w: imgW * 0.84,
-          h: rowH * 0.9,
+          x: contentL,
+          y: rowY,
+          w: imgW * 0.88,
+          h: rowH,
         });
 
-        const icon = potionImgs[id];
-        const iw = 26 * scaleX, ih = 26 * scaleY;
-        if (icon && icon.complete && icon.naturalWidth > 0) {
-          ctx.drawImage(icon, listX, y - ih * 0.7, iw, ih);
+        const isHovered = (shopHoverId === id);
+
+        // — highlight row on hover —
+        if (isHovered) {
+          ctx.fillStyle = "rgba(255,255,255,0.08)";
+          ctx.fillRect(contentL, rowY, imgW * 0.88, rowH);
         }
 
-        const owned = inv[id] ?? 0;
+        // — icon (scaled to row height) —
+        const icon = potionImgs[id];
+        const iSize = rowH * 0.8;
+        if (icon && icon.complete && icon.naturalWidth > 0) {
+          ctx.drawImage(icon, contentL + imgW * 0.01, rowY + (rowH - iSize) / 2, iSize, iSize);
+        }
 
+        // — potion name —
         ctx.fillStyle = "white";
-        ctx.fillText(`${p.name}`, listX + 40 * scaleX, y);
+        ctx.fillText(p.name, contentL + imgW * 0.10, textY);
 
-        ctx.fillStyle = "rgba(255,255,255,0.75)";
-        ctx.fillText(`+${p.heal} ${p.type.toUpperCase()}`, listX + 260 * scaleX, y);
-
-        ctx.fillStyle = "rgba(255,215,0,0.95)";
-        ctx.fillText(`${p.price}`, listX + 460 * scaleX, y);
-
+        // — owned count (always visible) —
         ctx.fillStyle = "rgba(255,255,255,0.65)";
-        ctx.fillText(`x${owned}`, listX + 540 * scaleX, y);
+        ctx.fillText(`x${inv[id] ?? 0}`, shopBx + imgW * 0.88, textY);
+      }
+
+      // — tooltip on hover (show effect + price) —
+      if (shopHoverId) {
+        const hp = POTIONS.find(x => x.id === shopHoverId);
+        if (hp) {
+          const tipW = imgW * 0.32;
+          const tipH = imgH * 0.09;
+          const tipX = Math.min(shopMouseX + 12, shopBx + imgW - tipW - 5);
+          const tipY = Math.min(shopMouseY + 12, shopBy + imgH - tipH - 5);
+
+          ctx.fillStyle = "rgba(0,0,0,0.85)";
+          ctx.strokeStyle = "rgba(255,215,0,0.6)";
+          ctx.lineWidth = 1;
+          ctx.fillRect(tipX, tipY, tipW, tipH);
+          ctx.strokeRect(tipX, tipY, tipW, tipH);
+
+          const tipFontSize = Math.max(9, Math.round(tipH * 0.3));
+          ctx.font = `bold ${tipFontSize}px Arial`;
+
+          ctx.fillStyle = "rgba(255,255,255,0.9)";
+          ctx.fillText(`+${hp.heal} ${hp.type.toUpperCase()}`, tipX + 8, tipY + tipH * 0.4);
+
+          ctx.fillStyle = "rgba(255,215,0,0.95)";
+          ctx.fillText(`Price: ${hp.price} mesos`, tipX + 8, tipY + tipH * 0.75);
+        }
       }
     }
   }
@@ -1620,10 +1681,8 @@ window.addEventListener("keydown", (e) => {
   // ===== SHOP SYSTEM =====
 
   if (e.code === "KeyE") {
-    if (intersects(player, shopNpc)) {
-      shopOpen = !shopOpen;
-      if (shopOpen) shopTab = 1;
-    }
+    shopOpen = !shopOpen;
+    if (shopOpen) shopTab = 1;
   }
 
 
@@ -1709,7 +1768,8 @@ async function boot() {
     await loadMapForQuest(questState.activeQuestId);
   }
   // === PLACE NPC AFTER MAP LOAD ===
-  shopNpc.y = WORLD.groundY - shopNpc.h - 20;
+  shopNpc.x = WORLD.npcX ?? 745;
+  shopNpc.y = WORLD.npcY ?? (WORLD.groundY - shopNpc.h - 20);
 
 
 
