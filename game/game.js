@@ -21,6 +21,7 @@ resizeCanvas();
 window.addEventListener("resize", resizeCanvas);
 
 const UI = {
+  hud: document.getElementById("hud"),
   questTitle: document.getElementById("questTitle"),
   questDesc: document.getElementById("questDesc"),
   questProgress: document.getElementById("questProgress"),
@@ -39,6 +40,14 @@ const UI = {
   invBtn: document.getElementById("invBtn"),
   invPanel: document.getElementById("invPanel"),
   invInfo: document.getElementById("invInfo"),
+
+  // ===== LOGIN =====
+  loginScreen: document.getElementById("loginScreen"),
+  loginUser: document.getElementById("loginUser"),
+  loginPass: document.getElementById("loginPass"),
+  loginBtn: document.getElementById("loginBtn"),
+  googleBtn: document.getElementById("googleBtn"),
+  loginMsg: document.getElementById("loginMsg"),
 };
 
 
@@ -67,6 +76,50 @@ const CONFIG = {
   playerMaxHP: 30,
   touchDamageCooldownMs: 500,
 };
+
+const CLASS_DB = {
+  warrior: {
+    baseHP: 120,
+    baseMP: 30,
+    baseStats: { str: 6, vit: 4, dex: 1, int: 0, luk: 0 },
+    growth: { str: 5, vit: 3, dex: 1, int: 0, luk: 0 },
+    allowedWeapons: ["sword", "axe", "spear"],
+    skills: ["powerStrike"],
+  },
+  mage: {
+    baseHP: 60,
+    baseMP: 120,
+    baseStats: { str: 0, vit: 2, dex: 1, int: 8, luk: 2 },
+    growth: { str: 0, vit: 1, dex: 0, int: 6, luk: 2 },
+    allowedWeapons: ["staff", "wand"],
+    skills: ["magicBolt"],
+  },
+  thief: {
+    baseHP: 80,
+    baseMP: 50,
+    baseStats: { str: 1, vit: 3, dex: 6, int: 0, luk: 5 },
+    growth: { str: 0, vit: 1, dex: 4, int: 0, luk: 3 },
+    allowedWeapons: ["dagger", "claw"],
+    skills: ["doubleStab"],
+  },
+  archer: {
+    baseHP: 85,
+    baseMP: 60,
+    baseStats: { str: 1, vit: 3, dex: 8, int: 0, luk: 2 },
+    growth: { str: 0, vit: 2, dex: 5, int: 0, luk: 1 },
+    allowedWeapons: ["bow", "crossbow"],
+    skills: ["arrowShot"],
+  },
+  pirate: {
+    baseHP: 95,
+    baseMP: 70,
+    baseStats: { str: 6, vit: 4, dex: 5, int: 0, luk: 0 },
+    growth: { str: 4, vit: 2, dex: 3, int: 0, luk: 0 },
+    allowedWeapons: ["knuckle", "gun"],
+    skills: ["rapidPunch"],
+  },
+};
+
 const PLAYER_HITBOX = {
   // כמה להוריד/להצר את הקוליז'ן ביחס לתמונה
   offsetX: 16,
@@ -203,7 +256,7 @@ canvas.addEventListener("mousemove", (e) => {
   if (shopOpen && shopTab === 2) {
     for (const it of shopItemRects) {
       if (shopMouseX >= it.x && shopMouseX <= it.x + it.w &&
-          shopMouseY >= it.y && shopMouseY <= it.y + it.h) {
+        shopMouseY >= it.y && shopMouseY <= it.y + it.h) {
         shopHoverId = it.id;
         break;
       }
@@ -240,6 +293,34 @@ function expNeededForLevel(lv) {
   return Math.floor(30 + (lv - 1) * 18 + (lv - 1) * (lv - 1) * 6);
 }
 
+function getClassData(player) {
+  return CLASS_DB[player.class] || CLASS_DB.warrior;
+}
+
+function applyClassBase(player, classKey) {
+  const c = CLASS_DB[classKey];
+  if (!c) throw new Error("Invalid class: " + classKey);
+
+  player.class = classKey;
+  player.classLocked = true;
+
+  // בסיס סטטים
+  player.str = c.baseStats.str;
+  player.vit = c.baseStats.vit;
+
+  // להכנה לעתיד (לא שובר כלום)
+  player.dex = c.baseStats.dex;
+  player.int = c.baseStats.int;
+  player.luk = c.baseStats.luk;
+
+  // בסיס HP/MP
+  player.baseHPFromClass = c.baseHP;
+  player.baseMPFromClass = c.baseMP;
+
+  // מערכת MP בסיסית
+  player.maxMP = c.baseMP;
+  player.mp = c.baseMP;
+}
 
 function applyLevelStats() {
   // STR מעלה דמג'
@@ -248,7 +329,8 @@ function applyLevelStats() {
 
   // VIT raises max HP: +6 HP per VIT point (changed from 3 -> 6)
   const oldMax = player.maxHP;
-  player.maxHP = CONFIG.playerMaxHP + (player.vit || 0) * 6;
+  const baseHP = player.baseHPFromClass ?? CONFIG.playerMaxHP;
+  player.maxHP = baseHP + (player.vit || 0) * 6;
 
   // When max HP increases, heal proportionally up to the new max (do not reduce HP)
   if (player.maxHP > oldMax) {
@@ -429,6 +511,10 @@ function loadImage(src) {
 }
 // ===== DAMAGE DIGITS (Maple-style) =====
 const dmgDigits = {};
+const dmgSpecial = {
+  miss: null,
+  block: null, // אופציונלי אם תוסיף Block.png
+};
 
 function loadDmgDigits() {
   for (let i = 0; i <= 9; i++) {
@@ -436,8 +522,11 @@ function loadDmgDigits() {
     img.src = `./assets/ui/dmg/${i}.png`;
     dmgDigits[i] = img;
   }
-}
 
+  // ✅ MISS sprite
+  dmgSpecial.miss = new Image();
+  dmgSpecial.miss.src = `./assets/ui/dmg/Miss.png`; // חייב להיות בדיוק אותו שם
+}
 
 const mobFrames = new Map();
 const playerFrames = new Map();
@@ -456,6 +545,15 @@ const inv = {
   mp3: 0,
 };
 
+// ===== HOTBAR =====
+const hotbar = [
+  { type: "item", id: "hp1" }, // Slot 1
+  { type: "item", id: "hp2" }, // Slot 2
+  { type: "item", id: "hp3" }, // Slot 3
+  { type: "item", id: "mp1" }, // Slot 4
+  { type: "item", id: "mp2" }, // Slot 5
+  { type: "item", id: "mp3" }, // Slot 6
+];
 
 const MESO_TYPES = [
   { name: "mesos1", min: 1, max: 49, frames: 4, w: 22, h: 22 },
@@ -703,6 +801,7 @@ let mobStatsMap = new Map();
 let questsDb = null;
 let questIndex = new Map();
 let questState = null;
+let questReadyToClaim = false;
 let mapsDb = {};
 let currentMapName = "";
 
@@ -716,6 +815,22 @@ const player = {
   w: 50,
   h: 70,
   facing: 1,
+
+  class: "warrior",
+  classLocked: false,
+
+  // סטטים נוספים להמשך (לא שובר כלום)
+  dex: 0,
+  int: 0,
+  luk: 0,
+
+  // בסיסים שמגיעים מהקלאס
+  baseHPFromClass: CONFIG.playerMaxHP,
+  baseMPFromClass: 0,
+
+  // MP בסיסי
+  maxMP: 0,
+  mp: 0,
 
   anim: "stand",
   animUntil: 0,
@@ -751,6 +866,7 @@ const player = {
 let mobs = [];
 let lastSpawnAt = 0;
 let damageTexts = [];
+let isLoggedIn = false;
 
 
 function getMobStat(mobId, key, fallback) {
@@ -785,7 +901,7 @@ function spawnMob(mobId, x, platform = null) {
     id: Number(mobId),
     x, y,
     w, h,
-    platform, // NEW
+    platform,
     maxHP, hp: maxHP,
     exp,
     state: "stand",
@@ -796,6 +912,9 @@ function spawnMob(mobId, x, platform = null) {
     nextWanderSwitchAt: nowMs() + randBetween(CONFIG.mobWanderSwitchMsMin, CONFIG.mobWanderSwitchMsMax),
     aggroUntil: 0,
 
+    // ✅ Hit Flash
+    flashUntil: 0,
+    flashKind: "hit",
   };
 }
 
@@ -846,7 +965,7 @@ function onMobKilled(mobId) {
   }
 
   if (isQuestCompleted(questState.activeQuest, questState.progress)) {
-    completeQuest(questState.activeQuest);
+    questReadyToClaim = true;
   }
 }
 
@@ -870,11 +989,25 @@ function tryAttack() {
   for (const m of mobs) {
     if (m.dead) continue;
     if (!intersects(atk, m)) continue;
+    // ✅ MISS roll
+    if (Math.random() < 0.05) {
+      damageTexts.push({
+        x: m.x + m.w / 2,
+        y: m.y,
+        kind: "miss",
+        value: 0,
+        life: 0.7,
+      });
+      continue; // לא מורידים HP, לא HIT, לא KNOCKBACK
+    }
 
     // לחשב דמג' אמיתי (לא יותר מהחיים שנותרו)
     const realDamage = Math.min(player.damage, m.hp);
 
     m.hp -= realDamage;
+    // ✅ Activate hit flash
+    m.flashUntil = nowMs() + 90; // 90ms הבזק
+    m.flashKind = "hit";
 
     // AGGRO: המוב ננעל על השחקן ל-2.5 שניות
     m.aggroUntil = nowMs() + 2500;
@@ -890,14 +1023,13 @@ function tryAttack() {
     const maxX = p.x + p.w - m.w;
     m.x = Math.max(minX, Math.min(m.x, maxX));
 
-    // ליצור טקסט דמג'
     damageTexts.push({
       x: m.x + m.w / 2,
       y: m.y,
+      kind: "hit",
       value: realDamage,
       life: 0.6,
     });
-
     if (m.hp <= 0) {
       m.hp = 0;
       m.dead = true;
@@ -990,9 +1122,10 @@ async function loadMapForQuest(questId) {
 
 async function completeQuest(quest) {
   questState.completed.add(quest.id);
+  questReadyToClaim = false; // ✅ חשוב! לאפס כשמסיימים/עוברים משימה
 
   if (quest.rewards && typeof quest.rewards.exp === "number") {
-    player.exp += quest.rewards.exp;
+    gainExp(quest.rewards.exp);
   }
 
   const next = (quest.unlocks && quest.unlocks.length > 0) ? quest.unlocks[0] : null;
@@ -1005,30 +1138,22 @@ async function completeQuest(quest) {
     questState.activeQuest = null;
   }
 
-  // Load the appropriate map for the active quest
   if (questState.activeQuestId) {
     await loadMapForQuest(questState.activeQuestId);
 
-    // For qBoss quests, place player on ground platform
     if (questState.activeQuestId.startsWith("qBoss")) {
       const groundPlatform = WORLD.platforms[0];
       player.y = groundPlatform.y - PLAYER_HITBOX.offsetY - PLAYER_HITBOX.h;
     } else {
-      // For normal quests, place on the third floating platform
       const thirdPlatform = WORLD.platforms[3];
       player.y = thirdPlatform.y - PLAYER_HITBOX.offsetY - PLAYER_HITBOX.h;
     }
     player.vy = 0;
     player.onGround = true;
-
-
-
   }
 
   await refreshNeededAssets();
-
 }
-
 function getQuestTargetMobIds() {
   const q = questState.activeQuest;
   if (!q) return [];
@@ -1064,8 +1189,22 @@ function renderQuestUI() {
     }
   }
 
-  UI.questProgress.textContent = lines.join(" | ");
+  if (questReadyToClaim) {
+    UI.questProgress.innerHTML = `
+      <span style="color:lime; font-weight:bold;">
+        ✅ Quest Completed! (Click to claim EXP)
+      </span>
+    `;
+  } else {
+    UI.questProgress.textContent = lines.join(" | ");
+  }
+
   UI.playerStats.textContent = `HP: ${player.hp}/${player.maxHP} | EXP: ${player.exp} | Damage: ${player.damage} | Mobs: ${mobs.length}`;
+
+  // 👇👇👇 כאן בדיוק להוסיף
+  if (UI.hud) {
+    UI.hud.style.cursor = questReadyToClaim ? "pointer" : "default";
+  }
 }
 
 async function refreshNeededAssets() {
@@ -1349,24 +1488,127 @@ function drawFlipped(img, x, y, w, h) {
   ctx.drawImage(img, -w / 2, y, w, h);
   ctx.restore();
 }
+function drawShadow(cx, groundY, rx, ry, alpha = 0.28) {
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle = "black";
+  ctx.beginPath();
+  ctx.ellipse(cx, groundY, rx, ry, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
 
+function drawHudBottom() {
+  // ✅ נמוך יותר + קטן יותר
+  const hudH = 64 * scaleY;
+  const y = canvas.height - hudH; // צמוד לתחתית
+  const x = 0;
+  const hudW = canvas.width;
+
+  ctx.save();
+
+  // רקע דק
+  ctx.globalAlpha = 0.88;
+  ctx.fillStyle = "rgba(0,0,0,0.48)";
+  ctx.fillRect(x, y, hudW, hudH);
+  ctx.globalAlpha = 1;
+
+  // מסגרת עדינה
+  ctx.strokeStyle = "rgba(255,255,255,0.12)";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(x + 2, y + 2, hudW - 4, hudH - 4);
+
+  // ===== LV (שמאל) =====
+  ctx.fillStyle = "rgba(255,255,255,0.95)";
+  ctx.font = `bold ${18 * scaleY}px Arial`;
+  ctx.fillText(`LV ${player.level}`, x + 14 * scaleX, y + 26 * scaleY);
+
+  // ===== HP + MP באותה שורה =====
+  const barsX = x + 110 * scaleX;
+  const barsY = y + 10 * scaleY;
+
+  const barH = 16 * scaleY;
+  const gap = 14 * scaleX;
+
+  const totalBarsW = hudW - barsX - 18 * scaleX;
+  const halfW = (totalBarsW - gap) / 2;
+
+  // HP
+  const hpRatio = player.maxHP > 0 ? (player.hp / player.maxHP) : 0;
+  ctx.fillStyle = "rgba(255,255,255,0.10)";
+  ctx.fillRect(barsX, barsY, halfW, barH);
+  ctx.fillStyle = "rgba(0,220,60,0.85)";
+  ctx.fillRect(barsX, barsY, halfW * clamp(hpRatio, 0, 1), barH);
+  ctx.strokeStyle = "rgba(0,0,0,0.55)";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(barsX, barsY, halfW, barH);
+
+  ctx.fillStyle = "white";
+  ctx.font = `bold ${13 * scaleY}px Arial`;
+  ctx.fillText(`HP ${player.hp}/${player.maxHP}`, barsX + 8 * scaleX, barsY + 13 * scaleY);
+
+  // MP (placeholder)
+  const mpX = barsX + halfW + gap;
+  ctx.fillStyle = "rgba(255,255,255,0.10)";
+  ctx.fillRect(mpX, barsY, halfW, barH);
+  ctx.fillStyle = "rgba(0,160,255,0.75)";
+  const mpRatio = player.maxMP > 0 ? (player.mp / player.maxMP) : 0;
+  ctx.fillRect(mpX, barsY, halfW * clamp(mpRatio, 0, 1), barH);
+  ctx.strokeStyle = "rgba(0,0,0,0.55)";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(mpX, barsY, halfW, barH);
+
+  ctx.fillStyle = "white";
+  ctx.font = `bold ${13 * scaleY}px Arial`;
+  ctx.fillText(`MP ${player.mp}/${player.maxMP}`, mpX + 8 * scaleX, barsY + 13 * scaleY);
+
+  // ===== EXP פס דק למטה + טקסט באמצע =====
+  const expH = 10 * scaleY;
+  const expY = y + 38 * scaleY;
+  const expW = totalBarsW;
+
+  const expRatio = player.expToNext > 0 ? (player.exp / player.expToNext) : 0;
+
+  ctx.fillStyle = "rgba(255,255,255,0.08)";
+  ctx.fillRect(barsX, expY, expW, expH);
+
+  ctx.fillStyle = "rgba(0,160,255,0.85)";
+  ctx.fillRect(barsX, expY, expW * clamp(expRatio, 0, 1), expH);
+
+  ctx.strokeStyle = "rgba(0,0,0,0.55)";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(barsX, expY, expW, expH);
+
+  // טקסט EXP באמצע הפס
+  ctx.fillStyle = "rgba(255,255,255,0.95)";
+  ctx.font = `bold ${12 * scaleY}px Arial`;
+  ctx.textAlign = "center";
+  ctx.fillText(
+    `EXP ${Math.floor(player.exp)}/${player.expToNext}`,
+    barsX + expW / 2,
+    expY + expH - 1 * scaleY
+  );
+  ctx.textAlign = "start";
+
+  ctx.restore();
+}
 function render() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
   if (mapBgImg) {
     ctx.drawImage(mapBgImg, 0, 0, canvas.width, canvas.height);
   }
- // ===== DEBUG: SHOW PLATFORMS =====
-   ctx.fillStyle = "rgba(255,0,0,0.35)";
-   for (const p of WORLD.platforms) {
-     ctx.fillRect(
-       p.x * scaleX,
-       p.y * scaleY,
-       p.w * scaleX,
-       p.h * scaleY
-     );
-   }
- 
+  // ===== DEBUG: SHOW PLATFORMS =====
+  ctx.fillStyle = "rgba(255,0,0,0.35)";
+  for (const p of WORLD.platforms) {
+    ctx.fillRect(
+      p.x * scaleX,
+      p.y * scaleY,
+      p.w * scaleX,
+      p.h * scaleY
+    );
+  }
+
   // time once per frame
   const t = nowMs();
 
@@ -1387,6 +1629,11 @@ function render() {
   const sw = player.w * scaleX;
   const sh = player.h * scaleY;
 
+  // ✅ PLAYER SHADOW (לפני ציור השחקן)
+  const pFeetX = (player.x + player.w / 2) * scaleX;
+  const pFeetY = (playerBox().y + playerBox().h) * scaleY;
+  drawShadow(pFeetX, pFeetY, 18 * scaleX, 6 * scaleY, 0.25);
+
   if (pImg) {
     if (player.facing === -1) ctx.drawImage(pImg, sx, sy, sw, sh);
     else drawFlipped(pImg, sx, sy, sw, sh);
@@ -1395,38 +1642,6 @@ function render() {
     ctx.fillRect(sx, sy, sw, sh);
   }
 
-  // player HP bar (above head)
-  ctx.fillStyle = "rgba(255,255,255,0.25)";
-  ctx.fillRect(player.x * scaleX, (player.y - 12) * scaleY, player.w * scaleX, 6 * scaleY);
-  ctx.fillStyle = "rgba(0,255,0,0.7)";
-  ctx.fillRect(
-    player.x * scaleX,
-    (player.y - 12) * scaleY,
-    (player.w * (player.hp / Math.max(1, player.maxHP))) * scaleX,
-    6 * scaleY
-  );
-
-  // ===== EXP BAR (bottom-left) =====
-  const expBarW = 260 * scaleX;
-  const expBarH = 10 * scaleY;
-  const expBx = 12 * scaleX;
-  const expBy = (ORIGINAL_HEIGHT - 20) * scaleY;
-
-  const ratio = player.expToNext > 0 ? (player.exp / player.expToNext) : 0;
-
-  ctx.fillStyle = "rgba(0,0,0,0.45)";
-  ctx.fillRect(expBx, expBy, expBarW, expBarH);
-
-  ctx.fillStyle = "rgba(0,160,255,0.85)";
-  ctx.fillRect(expBx, expBy, expBarW * clamp(ratio, 0, 1), expBarH);
-
-  ctx.fillStyle = "white";
-  ctx.font = `${14 * scaleY}px Arial`;
-  ctx.fillText(
-    `LV ${player.level}  EXP ${Math.floor(player.exp)}/${player.expToNext}`,
-    expBx,
-    expBy - 4 * scaleY
-  );
 
   // ===== NPC DRAW =====
   const npcScale = 0.65;
@@ -1461,8 +1676,27 @@ function render() {
     const mw = m.w * scaleX * scale;
     const mh = m.h * scaleY * scale;
 
+    // ✅ MOB SHADOW (לפני ציור המוב)
+    const mFeetX = (m.x + m.w / 2) * scaleX;
+    const mFeetY = (m.y + m.h) * scaleY;
+    drawShadow(
+      mFeetX,
+      mFeetY,
+      (isBoss ? 30 : 10) * scaleX,
+      (isBoss ? 9 : 3) * scaleY,
+      0.22
+    );
+
+
     const offsetX = isBoss ? (mw - m.w * scaleX) / 2 : 0;
     const offsetY = mh - m.h * scaleY;
+    const flashing = nowMs() < (m.flashUntil || 0);
+
+    ctx.save();
+    if (flashing) {
+      // הבזק לבן קצר
+      ctx.filter = "brightness(2.2) contrast(1.2)";
+    }
 
     if (img) {
       if (m.dir === 1) drawFlipped(img, mx - offsetX, my - offsetY, mw, mh);
@@ -1480,6 +1714,7 @@ function render() {
     ctx.fillRect(mx - offsetX, hpBarY, hpBarW, hpBarH);
     ctx.fillStyle = isBoss ? "rgba(255,100,0,0.9)" : "rgba(255,0,0,0.7)";
     ctx.fillRect(mx - offsetX, hpBarY, hpBarW * (m.hp / m.maxHP), hpBarH);
+    ctx.restore();
   }
 
   // mesos
@@ -1494,6 +1729,26 @@ function render() {
   for (const d of damageTexts) {
     const alpha = Math.max(d.life, 0);
     ctx.globalAlpha = alpha;
+    // ✅ MISS sprite draw
+    if (d.kind === "miss") {
+      const img = dmgSpecial.miss;
+
+      if (img && img.complete && img.naturalWidth > 0) {
+        const w = 70 * scaleX;
+        const h = 26 * scaleY;
+        ctx.drawImage(img, d.x * scaleX - w / 2, d.y * scaleY, w, h);
+      } else {
+        // fallback אם לא נטען
+        ctx.fillStyle = "white";
+        ctx.font = `bold ${18 * scaleY}px Arial`;
+        ctx.textAlign = "center";
+        ctx.fillText("MISS", d.x * scaleX, d.y * scaleY);
+        ctx.textAlign = "start";
+      }
+
+      ctx.globalAlpha = 1;
+      continue; // לא לצייר מספרים
+    }
 
     const valueStr = String(Math.floor(d.value));
 
@@ -1565,8 +1820,8 @@ function render() {
     if (shopTab === 2) {
       // All positions proportional to shop image dimensions
       const contentL = shopBx + imgW * 0.07;   // left edge of content area
-      const listY    = shopBy + imgH * 0.31;    // first row top
-      const rowH     = imgH * 0.062;            // row height (fits ~10 rows)
+      const listY = shopBy + imgH * 0.31;    // first row top
+      const rowH = imgH * 0.062;            // row height (fits ~10 rows)
 
       const items = [
         ["1", "hp1"], ["2", "hp2"], ["3", "hp3"],
@@ -1581,7 +1836,7 @@ function render() {
         const p = POTIONS.find(x => x.id === id);
         if (!p) continue;
 
-        const rowY  = listY + i * rowH;
+        const rowY = listY + i * rowH;
         const textY = rowY + rowH * 0.65;       // vertically center text
 
         shopItemRects.push({
@@ -1643,7 +1898,8 @@ function render() {
       }
     }
   }
-
+  // ✅ HUD bottom (HP/MP/EXP + LV + MESOS)
+  drawHudBottom();
   // quest UI always last
   renderQuestUI();
 }
@@ -1657,6 +1913,13 @@ function loop() {
   const dt = Math.min(0.033, (t - lastFrameAt) / 1000);
   lastFrameAt = t;
 
+  // 🔒 לעצור את המשחק עד התחברות
+  if (!isLoggedIn) {
+    render();
+    requestAnimationFrame(loop);
+    return;
+  }
+
   updatePlayer(dt);
   updateMobs(dt);
   updateDamageTexts(dt);
@@ -1665,12 +1928,13 @@ function loop() {
   spawnLogic();
   render();
 
-
-
   requestAnimationFrame(loop);
 }
 
 window.addEventListener("keydown", (e) => {
+
+  if (!isLoggedIn) return; // 🔒 לא לאפשר מקשים לפני Login
+
   if (e.code === "Space") e.preventDefault();
   keys.add(e.code);
 
@@ -1679,12 +1943,10 @@ window.addEventListener("keydown", (e) => {
   if (e.code === "KeyI") toggleInv();
 
   // ===== SHOP SYSTEM =====
-
   if (e.code === "KeyE") {
     shopOpen = !shopOpen;
     if (shopOpen) shopTab = 1;
   }
-
 
   // Buy potions when shop is open
   if (shopOpen) {
@@ -1699,7 +1961,6 @@ window.addEventListener("keydown", (e) => {
     if (e.code === "Escape") shopOpen = false;
   }
 });
-
 window.addEventListener("keyup", (e) => keys.delete(e.code));
 
 canvas.addEventListener("mousedown", (e) => {
@@ -1761,20 +2022,19 @@ async function boot() {
 
   initQuestState();
   player.expToNext = expNeededForLevel(player.level);
+  applyClassBase(player, "warrior"); // זמני, אחר כך יהיה מהמסך בחירה
   applyLevelStats();
 
   // Load the map for the initial quest
   if (questState.activeQuestId) {
     await loadMapForQuest(questState.activeQuestId);
   }
+
   // === PLACE NPC AFTER MAP LOAD ===
   shopNpc.x = WORLD.npcX ?? 745;
   shopNpc.y = WORLD.npcY ?? (WORLD.groundY - shopNpc.h - 20);
 
-
-
   // place player on third platform (not flying)
-  // Feet should be at platform.y, so: player.y + offsetY + hitbox.h = platform.y
   const thirdPlatform = WORLD.platforms[3];
   player.y = thirdPlatform.y - PLAYER_HITBOX.offsetY - PLAYER_HITBOX.h;
   player.vy = 0;
@@ -1804,7 +2064,6 @@ async function boot() {
     climbLadder: playerFrames.get("climbLadder")?.length ?? 0,
   });
 
-
   // OPTIONAL DEBUG: show if something failed to load
   for (const k of ["stand", "walk", "jump", "attack1", "attack2", "attackF", "climbRope", "climbLadder"]) {
     const n = playerFrames.get(k)?.length ?? 0;
@@ -1820,6 +2079,24 @@ async function boot() {
   // ✅ INVENTORY BUTTON EVENT
   UI.invBtn?.addEventListener("click", toggleInv);
 
+  // ✅ Claim quest reward by clicking the quest progress text
+
+  let claimingQuest = false;
+
+  UI.hud?.addEventListener("click", async () => {
+    if (!questReadyToClaim) return;
+    if (!questState?.activeQuest) return;
+    if (claimingQuest) return;
+
+    claimingQuest = true;
+    questReadyToClaim = false;
+
+    try {
+      await completeQuest(questState.activeQuest);
+    } finally {
+      claimingQuest = false;
+    }
+  });
 
   UI.btnAddSTR?.addEventListener("click", () => {
     addSTR();
@@ -1837,10 +2114,54 @@ async function boot() {
   loadMesoFrames();
 
 
+  // ===== LOGIN SYSTEM =====
+  function doLogin(username) {
+    isLoggedIn = true;
+
+    if (UI.loginScreen) UI.loginScreen.style.display = "none";
+
+    // ✅ להחזיר UI אחרי login
+    if (UI.hud) UI.hud.style.display = "block";
+    if (UI.statsBtn) UI.statsBtn.style.display = "block";
+    if (UI.invBtn) UI.invBtn.style.display = "block";
+
+    localStorage.setItem("maple_user", username);
+    if (UI.loginMsg) UI.loginMsg.textContent = "";
+  }
+
+  UI.loginBtn?.addEventListener("click", () => {
+    const user = UI.loginUser?.value.trim();
+    const pass = UI.loginPass?.value.trim();
+
+    if (!user || !pass) {
+      if (UI.loginMsg) UI.loginMsg.textContent = "Enter username and password.";
+      return;
+    }
+
+    doLogin(user);
+  });
+
+  UI.googleBtn?.addEventListener("click", () => {
+    doLogin("google_user");
+  });
+
+  // Auto-login if already saved
+  const savedUser = localStorage.getItem("maple_user");
+
+  if (savedUser) {
+    doLogin(savedUser);
+  } else {
+    // להציג login
+    if (UI.loginScreen) UI.loginScreen.style.display = "flex";
+
+    // 🔒 להסתיר UI בזמן login
+    if (UI.hud) UI.hud.style.display = "none";
+    if (UI.statsBtn) UI.statsBtn.style.display = "none";
+    if (UI.invBtn) UI.invBtn.style.display = "none";
+  }
 
   requestAnimationFrame(loop);
 }
-
 
 boot().catch(err => {
   console.error(err);

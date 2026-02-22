@@ -19,6 +19,14 @@
       font-family: Arial, sans-serif;
     }
 
+    canvas {
+      display:block;
+      width:100%;
+      height:100%;
+      background:#1b1b1b;
+    }
+
+    /* ===== HUD ===== */
     #hud {
       position:fixed;
       top:10px;
@@ -37,13 +45,6 @@
     #questProgress { margin-bottom:6px; }
     #playerStats { margin-top:8px; }
     #errors { margin-top:8px; color:#ffb3b3; white-space:pre-wrap; font-size:13px; }
-
-    canvas {
-      display:block;
-      width:100%;
-      height:100%;
-      background:#1b1b1b;
-    }
 
     .small {
       font-size:13px;
@@ -81,9 +82,10 @@
       box-shadow:0 0 15px rgba(0,0,0,0.6);
     }
 
-    #statsPanel h3 {
-      margin:0 0 8px 0;
-      font-size:16px;
+    #statsButtons {
+      display:flex;
+      gap:8px;
+      margin-top:10px;
     }
 
     #statsPanel button {
@@ -96,57 +98,132 @@
       font-weight:bold;
     }
 
-    #statsPanel button:hover {
-      background:#666;
+    /* ===== INVENTORY ===== */
+    #invBtn {
+      position: fixed;
+      right: 15px;
+      bottom: 115px;
+      z-index: 200;
+      padding: 10px 14px;
+      font-size: 14px;
+      cursor: pointer;
+      border: none;
+      border-radius: 8px;
+      background: #00b36b;
+      color: white;
+      font-weight: bold;
     }
 
-    #statsButtons {
-      display:flex;
-      gap:8px;
-      margin-top:10px;
+    #invPanel {
+      position: fixed;
+      right: 15px;
+      bottom: 165px;
+      z-index: 200;
+      width: 260px;
+      padding: 14px;
+      background: rgba(0,0,0,0.85);
+      border-radius: 12px;
+      display: none;
+      box-shadow: 0 0 15px rgba(0,0,0,0.6);
     }
 
-    /* ===== INVENTORY BUTTON ===== */
-#invBtn {
-  position: fixed;
-  right: 15px;
-  bottom: 115px;
-  z-index: 200;
-  padding: 10px 14px;
-  font-size: 14px;
-  cursor: pointer;
-  border: none;
-  border-radius: 8px;
-  background: #00b36b;
-  color: white;
-  font-weight: bold;
-}
+    /* ============================= */
+    /* ===== LOGIN SCREEN ===== */
+    /* ============================= */
 
-/* ===== INVENTORY PANEL ===== */
-#invPanel {
-  position: fixed;
-  right: 15px;
-  bottom: 165px;
-  z-index: 200;
-  width: 260px;
-  padding: 14px;
-  background: rgba(0,0,0,0.85);
-  border-radius: 12px;
-  display: none;
-  box-shadow: 0 0 15px rgba(0,0,0,0.6);
-}
+    #loginScreen {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: radial-gradient(circle at top, #1b2a5c, #050814);
+      color: white;
+    }
 
-#invPanel h3 {
-  margin: 0 0 8px 0;
-  font-size: 16px;
-}
+    #loginBox {
+      width: 360px;
+      padding: 22px;
+      background: rgba(0,0,0,0.55);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 14px;
+      box-shadow: 0 12px 40px rgba(0,0,0,0.55);
+      text-align: center;
+    }
 
+    #loginTitle {
+      font-size: 28px;
+      font-weight: 800;
+      margin-bottom: 6px;
+    }
+
+    #loginSub {
+      opacity: 0.85;
+      margin-bottom: 18px;
+    }
+
+    .loginInput {
+      width: 100%;
+      padding: 12px;
+      margin: 6px 0;
+      border-radius: 10px;
+      border: 1px solid rgba(255,255,255,0.18);
+      background: rgba(255,255,255,0.08);
+      color: white;
+      outline: none;
+    }
+
+    .loginBtn {
+      width: 100%;
+      padding: 12px;
+      border-radius: 10px;
+      border: none;
+      cursor: pointer;
+      font-weight: 700;
+      margin-top: 6px;
+    }
+
+    #loginBtn {
+      background: #2ecc71;
+      color: #06120a;
+      margin-bottom: 10px;
+    }
+
+    #googleBtn {
+      background: rgba(255,255,255,0.08);
+      color: white;
+      border: 1px solid rgba(255,255,255,0.18);
+    }
+
+    #loginMsg {
+      margin-top: 12px;
+      color: #ffcc66;
+      min-height: 18px;
+    }
 
   </style>
 </head>
 
 <body>
 
+  <!-- LOGIN OVERLAY -->
+  <div id="loginScreen">
+    <div id="loginBox">
+      <div id="loginTitle">Maple Login</div>
+      <div id="loginSub">Sign in to continue</div>
+
+      <input id="loginUser" class="loginInput" placeholder="Username" />
+      <input id="loginPass" class="loginInput" type="password" placeholder="Password" />
+
+      <button id="loginBtn" class="loginBtn">Login</button>
+      <button id="googleBtn" class="loginBtn">Continue with Google (demo)</button>
+
+      <div id="loginMsg"></div>
+    </div>
+  </div>
+
+  <!-- HUD -->
   <div id="hud">
     <div id="questTitle"></div>
     <div id="questDesc"></div>
@@ -156,36 +233,23 @@
     <div id="errors"></div>
   </div>
 
-  <!-- STATS BUTTON -->
+  <!-- STATS -->
   <button id="statsBtn">Stats</button>
-
-  <!-- STATS PANEL -->
   <div id="statsPanel">
     <h3>Player Stats</h3>
     <div id="statsInfo"></div>
-
     <div id="statsButtons">
       <button id="btnAddSTR">+ STR</button>
       <button id="btnAddVIT">+ VIT</button>
     </div>
-
-    <div style="margin-top:8px; font-size:12px; opacity:.8;">
-      Spend your SP here.
-    </div>
   </div>
 
-    <!-- INVENTORY BUTTON -->
+  <!-- INVENTORY -->
   <button id="invBtn">Inventory</button>
-
-  <!-- INVENTORY PANEL -->
   <div id="invPanel">
     <h3>Inventory</h3>
     <div id="invInfo">Mesos: 0</div>
-    <div style="margin-top:8px; font-size:12px; opacity:.8;">
-      Press I to open.
-    </div>
   </div>
-
 
   <canvas id="c"></canvas>
 
