@@ -2073,7 +2073,7 @@ function render() {
 
     for (const ch of valueStr) {
       const img = dmgDigits[ch];
-      if (img) ctx.drawImage(img, drawX, drawYY, digitW, digitH);
+      if (img && img.complete && img.naturalWidth > 0) ctx.drawImage(img, drawX, drawYY, digitW, digitH);
       drawX += digitW;
     }
 
