@@ -52,80 +52,173 @@
       margin-top:6px;
     }
 
-    /* ===== STATS BUTTON ===== */
-    #statsBtn {
-      position:fixed;
-      right:15px;
-      bottom:15px;
-      z-index:200;
-      padding:10px 14px;
-      font-size:14px;
-      cursor:pointer;
-      border:none;
-      border-radius:8px;
-      background:#2d7cff;
-      color:white;
-      font-weight:bold;
-    }
-
-    /* ===== STATS PANEL ===== */
-    #statsPanel {
-      position:fixed;
-      right:15px;
-      bottom:65px;
-      z-index:200;
-      width:260px;
-      padding:14px;
-      background:rgba(0,0,0,0.85);
-      border-radius:12px;
-      display:none;
-      box-shadow:0 0 15px rgba(0,0,0,0.6);
-    }
-
-    #statsButtons {
-      display:flex;
-      gap:8px;
-      margin-top:10px;
-    }
-
-    #statsPanel button {
-      cursor:pointer;
-      padding:6px;
-      border-radius:6px;
-      border:none;
-      background:#444;
-      color:white;
-      font-weight:bold;
-    }
-
-    /* ===== INVENTORY ===== */
-    #invBtn {
+    /* ===== TOP-RIGHT MENU ===== */
+    #gameMenu {
       position: fixed;
-      right: 15px;
-      bottom: 115px;
-      z-index: 200;
-      padding: 10px 14px;
-      font-size: 14px;
+      top: 10px;
+      right: 10px;
+      z-index: 300;
+      display: none;
+    }
+
+    #menuToggle {
+      padding: 9px 14px;
+      font-size: 15px;
       cursor: pointer;
       border: none;
       border-radius: 8px;
-      background: #00b36b;
+      background: rgba(0,0,0,0.65);
+      color: white;
+      font-weight: bold;
+      letter-spacing: 1px;
+    }
+    #menuToggle:hover { background: rgba(0,0,0,0.8); }
+
+    #menuDropdown {
+      display: none;
+      position: absolute;
+      top: 42px;
+      right: 0;
+      min-width: 150px;
+      background: rgba(10,10,18,0.92);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 10px;
+      box-shadow: 0 8px 28px rgba(0,0,0,0.6);
+      overflow: hidden;
+    }
+    #menuDropdown.open { display: block; }
+
+    .menuItem {
+      display: block;
+      width: 100%;
+      padding: 12px 18px;
+      border: none;
+      background: none;
+      color: white;
+      font-size: 14px;
+      font-weight: 600;
+      text-align: left;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .menuItem:hover { background: rgba(255,255,255,0.1); }
+    .menuItem.danger { color: #ff6b6b; }
+    .menuItem.save   { color: #f9ca24; }
+
+    .menuDivider {
+      height: 1px;
+      background: rgba(255,255,255,0.1);
+      margin: 2px 0;
+    }
+
+    /* ===== STATS PANEL (appears below menu) ===== */
+    #statsPanel {
+      position: fixed;
+      top: 56px;
+      right: 10px;
+      z-index: 290;
+      width: 260px;
+      padding: 14px;
+      background: rgba(10,10,18,0.92);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 12px;
+      display: none;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+    }
+
+    #statsButtons {
+      display: flex;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    #statsPanel button {
+      cursor: pointer;
+      padding: 6px;
+      border-radius: 6px;
+      border: none;
+      background: #444;
       color: white;
       font-weight: bold;
     }
 
+    /* ===== INVENTORY PANEL ===== */
     #invPanel {
       position: fixed;
-      right: 15px;
-      bottom: 165px;
-      z-index: 200;
-      width: 260px;
+      top: 56px;
+      right: 10px;
+      z-index: 290;
+      width: 280px;
       padding: 14px;
-      background: rgba(0,0,0,0.85);
+      background: rgba(10,10,18,0.92);
+      border: 1px solid rgba(255,255,255,0.12);
       border-radius: 12px;
       display: none;
-      box-shadow: 0 0 15px rgba(0,0,0,0.6);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+      max-height: 70vh;
+      overflow-y: auto;
     }
+
+    .inv-potion-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 5px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+    .inv-potion-row:last-child { border-bottom: none; }
+    .inv-potion-row img { width: 28px; height: 28px; image-rendering: pixelated; }
+    .inv-potion-name { flex: 1; font-size: 13px; }
+    .inv-potion-qty { font-size: 13px; opacity: 0.7; min-width: 30px; text-align: right; }
+    .inv-use-btn {
+      padding: 4px 10px;
+      border: none;
+      border-radius: 6px;
+      background: #2ecc71;
+      color: #000;
+      font-weight: 700;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    .inv-use-btn:disabled { opacity: 0.3; cursor: default; }
+    .inv-use-btn:hover:not(:disabled) { background: #27ae60; }
+    .inv-use-btn.mp { background: #3498db; }
+    .inv-use-btn.mp:hover:not(:disabled) { background: #2980b9; }
+
+    /* ===== DEATH OVERLAY ===== */
+    #deathOverlay {
+      position: fixed;
+      inset: 0;
+      z-index: 8000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      background: rgba(0,0,0,0.75);
+      color: white;
+    }
+    #deathOverlay h1 {
+      font-size: 48px;
+      color: #e74c3c;
+      margin-bottom: 12px;
+      text-shadow: 0 0 20px rgba(231,76,60,0.6);
+    }
+    #deathOverlay p {
+      font-size: 18px;
+      opacity: 0.85;
+      margin-bottom: 24px;
+    }
+    #respawnBtn {
+      padding: 14px 32px;
+      font-size: 16px;
+      font-weight: 700;
+      border: none;
+      border-radius: 10px;
+      background: #e74c3c;
+      color: white;
+      cursor: pointer;
+    }
+    #respawnBtn:hover { background: #c0392b; }
 
     /* ============================= */
     /* ===== LOGIN SCREEN ===== */
@@ -190,10 +283,10 @@
       margin-bottom: 10px;
     }
 
-    #googleBtn {
-      background: rgba(255,255,255,0.08);
+    #registerBtn {
+      background: #3498db;
       color: white;
-      border: 1px solid rgba(255,255,255,0.18);
+      margin-bottom: 10px;
     }
 
     #loginMsg {
@@ -202,22 +295,59 @@
       min-height: 18px;
     }
 
+    /* ===== AUTH TABS ===== */
+    .authTabs {
+      display: flex;
+      margin-bottom: 16px;
+      gap: 0;
+    }
+    .authTab {
+      flex: 1;
+      padding: 10px;
+      border: none;
+      cursor: pointer;
+      font-weight: 700;
+      font-size: 15px;
+      background: rgba(255,255,255,0.06);
+      color: rgba(255,255,255,0.5);
+      transition: all 0.2s;
+    }
+    .authTab:first-child { border-radius: 8px 0 0 8px; }
+    .authTab:last-child  { border-radius: 0 8px 8px 0; }
+    .authTab.active {
+      background: rgba(255,255,255,0.15);
+      color: white;
+    }
+
+    #emailRow { display: none; }
+
+
+
   </style>
 </head>
 
 <body>
 
-  <!-- LOGIN OVERLAY -->
+  <!-- LOGIN / REGISTER OVERLAY -->
   <div id="loginScreen">
     <div id="loginBox">
       <div id="loginTitle">Maple Login</div>
-      <div id="loginSub">Sign in to continue</div>
+      <div id="loginSub">Sign in or create an account</div>
+
+      <!-- Tabs -->
+      <div class="authTabs">
+        <button class="authTab active" id="tabLogin" onclick="switchAuthTab('login')">Login</button>
+        <button class="authTab" id="tabRegister" onclick="switchAuthTab('register')">Register</button>
+      </div>
 
       <input id="loginUser" class="loginInput" placeholder="Username" />
+      <div id="emailRow">
+        <input id="loginEmail" class="loginInput" placeholder="Email" type="email" />
+      </div>
       <input id="loginPass" class="loginInput" type="password" placeholder="Password" />
 
       <button id="loginBtn" class="loginBtn">Login</button>
-      <button id="googleBtn" class="loginBtn">Continue with Google (demo)</button>
+      <button id="registerBtn" class="loginBtn" style="display:none;">Create Account</button>
 
       <div id="loginMsg"></div>
     </div>
@@ -233,8 +363,19 @@
     <div id="errors"></div>
   </div>
 
-  <!-- STATS -->
-  <button id="statsBtn">Stats</button>
+  <!-- TOP-RIGHT MENU -->
+  <div id="gameMenu">
+    <button id="menuToggle">☰ Menu</button>
+    <div id="menuDropdown">
+      <button class="menuItem" id="statsBtn">📊 Stats</button>
+      <button class="menuItem" id="invBtn">🎒 Inventory</button>
+      <div class="menuDivider"></div>
+      <button class="menuItem save" id="saveBtn">💾 Save Game</button>
+      <button class="menuItem danger" id="logoutBtn">🚪 Logout</button>
+    </div>
+  </div>
+
+  <!-- STATS PANEL -->
   <div id="statsPanel">
     <h3>Player Stats</h3>
     <div id="statsInfo"></div>
@@ -244,14 +385,48 @@
     </div>
   </div>
 
-  <!-- INVENTORY -->
-  <button id="invBtn">Inventory</button>
+  <!-- INVENTORY PANEL -->
   <div id="invPanel">
     <h3>Inventory</h3>
     <div id="invInfo">Mesos: 0</div>
+    <div id="invPotions"></div>
+    <div style="margin-top:8px; font-size:12px; opacity:0.5;">Keys 1-6 to use potions</div>
+  </div>
+
+  <!-- DEATH OVERLAY -->
+  <div id="deathOverlay">
+    <h1>YOU DIED</h1>
+    <p>Your quest progress has been reset.</p>
+    <button id="respawnBtn">Respawn</button>
   </div>
 
   <canvas id="c"></canvas>
+
+  <script>
+    // ── Auth tab switching (runs before game.js) ──
+    function switchAuthTab(tab) {
+      const tabLogin    = document.getElementById("tabLogin");
+      const tabRegister = document.getElementById("tabRegister");
+      const emailRow    = document.getElementById("emailRow");
+      const loginBtn    = document.getElementById("loginBtn");
+      const registerBtn = document.getElementById("registerBtn");
+
+      if (tab === "register") {
+        tabRegister.classList.add("active");
+        tabLogin.classList.remove("active");
+        emailRow.style.display    = "block";
+        loginBtn.style.display    = "none";
+        registerBtn.style.display = "block";
+      } else {
+        tabLogin.classList.add("active");
+        tabRegister.classList.remove("active");
+        emailRow.style.display    = "none";
+        loginBtn.style.display    = "block";
+        registerBtn.style.display = "none";
+      }
+      document.getElementById("loginMsg").textContent = "";
+    }
+  </script>
 
   <script src="./game.js"></script>
 

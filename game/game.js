@@ -41,13 +41,27 @@ const UI = {
   invPanel: document.getElementById("invPanel"),
   invInfo: document.getElementById("invInfo"),
 
+  // ===== TOP-RIGHT MENU =====
+  gameMenu: document.getElementById("gameMenu"),
+  menuToggle: document.getElementById("menuToggle"),
+  menuDropdown: document.getElementById("menuDropdown"),
+
   // ===== LOGIN =====
   loginScreen: document.getElementById("loginScreen"),
   loginUser: document.getElementById("loginUser"),
+  loginEmail: document.getElementById("loginEmail"),
   loginPass: document.getElementById("loginPass"),
   loginBtn: document.getElementById("loginBtn"),
-  googleBtn: document.getElementById("googleBtn"),
+  registerBtn: document.getElementById("registerBtn"),
   loginMsg: document.getElementById("loginMsg"),
+
+  // ===== SAVE / LOGOUT =====
+  saveBtn: document.getElementById("saveBtn"),
+  logoutBtn: document.getElementById("logoutBtn"),
+
+  // ===== DEATH =====
+  deathOverlay: document.getElementById("deathOverlay"),
+  respawnBtn: document.getElementById("respawnBtn"),
 };
 
 
@@ -394,6 +408,34 @@ function buyPotion(potionId) {
   inv[potionId] += 1;
 
   addError(`Bought ${p.name}`);
+  updateInvPanelText();
+}
+
+function usePotion(potionId) {
+  const p = POTIONS.find(x => x.id === potionId);
+  if (!p) return;
+  if ((inv[potionId] ?? 0) <= 0) {
+    addError(`No ${p.name} left!`);
+    return;
+  }
+  if (player.hp <= 0) return; // can't use when dead
+
+  inv[potionId] -= 1;
+
+  if (p.type === "hp") {
+    const before = player.hp;
+    player.hp = Math.min(player.hp + p.heal, player.maxHP);
+    const healed = player.hp - before;
+    addError(`Used ${p.name}: +${healed} HP`);
+  } else if (p.type === "mp") {
+    const before = player.mp;
+    player.mp = Math.min(player.mp + p.heal, player.maxMP);
+    const healed = player.mp - before;
+    addError(`Used ${p.name}: +${healed} MP`);
+  }
+
+  updateInvPanelText();
+  updateStatsPanelText();
 }
 
 
@@ -416,6 +458,23 @@ function setInvOpen(v) {
 function updateInvPanelText() {
   if (!UI.invInfo) return;
   UI.invInfo.innerHTML = `Mesos: <b>${playerMesos}</b>`;
+
+  // Build potion rows
+  const container = document.getElementById("invPotions");
+  if (!container) return;
+
+  let html = "";
+  for (const p of POTIONS) {
+    const qty = inv[p.id] ?? 0;
+    const typeClass = p.type === "mp" ? "mp" : "";
+    html += `<div class="inv-potion-row">`;
+    html += `  <img src="${p.img}" alt="${p.name}">`;
+    html += `  <span class="inv-potion-name">${p.name}<br><small style="opacity:0.5">+${p.heal} ${p.type.toUpperCase()}</small></span>`;
+    html += `  <span class="inv-potion-qty">x${qty}</span>`;
+    html += `  <button class="inv-use-btn ${typeClass}" onclick="usePotion('${p.id}')" ${qty <= 0 ? 'disabled' : ''}>Use</button>`;
+    html += `</div>`;
+  }
+  container.innerHTML = html;
 }
 
 
@@ -862,7 +921,189 @@ const player = {
   lastHurtAt: -999999,
 };
 
+// ═══════════════════════════════════════════════════════
+// ===== AUTH & SAVE/LOAD SYSTEM =====
+// ═══════════════════════════════════════════════════════
+const API_BASE = "/api";
+let authToken = localStorage.getItem("maple_token") || null;
+let currentUsername = null;
 
+// ── Auto-save interval (every 60 seconds) ─────────────
+let autoSaveInterval = null;
+
+function getAuthHeaders() {
+  return {
+    "Content-Type": "application/json",
+    Authorization: authToken ? `Bearer ${authToken}` : "",
+  };
+}
+
+// Collect current game state into a plain object
+function collectGameData() {
+  return {
+    level: player.level,
+    exp: player.exp,
+    expToNext: player.expToNext,
+    playerClass: player.class,
+    classLocked: player.classLocked,
+
+    hp: player.hp,
+    maxHP: player.maxHP,
+    mp: player.mp,
+    maxMP: player.maxMP,
+
+    str: player.str,
+    vit: player.vit,
+    dex: player.dex,
+    int: player.int,
+    luk: player.luk,
+    statPoints: player.statPoints,
+    damage: player.damage,
+
+    baseHPFromClass: player.baseHPFromClass,
+    baseMPFromClass: player.baseMPFromClass,
+
+    x: player.x,
+    y: player.y,
+    facing: player.facing,
+
+    mesos: playerMesos,
+
+    inventory: { ...inv },
+
+    currentQuestId: questState?.activeQuestId || null,
+    completedQuests: questState ? Array.from(questState.completed) : [],
+    questProgress: questState?.progress ? { ...questState.progress } : {},
+    currentMap: currentMapName,
+  };
+}
+
+// Apply loaded game data onto the running game state
+async function applyGameData(gd) {
+  if (!gd) return;
+
+  player.level       = gd.level       ?? player.level;
+  player.exp         = gd.exp         ?? player.exp;
+  player.expToNext   = gd.expToNext   ?? player.expToNext;
+
+  if (gd.playerClass) {
+    applyClassBase(player, gd.playerClass);
+  }
+  player.classLocked = gd.classLocked ?? player.classLocked;
+
+  player.str        = gd.str        ?? player.str;
+  player.vit        = gd.vit        ?? player.vit;
+  player.dex        = gd.dex        ?? player.dex;
+  player.int        = gd.int        ?? player.int;
+  player.luk        = gd.luk        ?? player.luk;
+  player.statPoints = gd.statPoints ?? player.statPoints;
+
+  applyLevelStats();
+
+  player.hp    = gd.hp    ?? player.hp;
+  player.maxHP = gd.maxHP ?? player.maxHP;
+  player.mp    = gd.mp    ?? player.mp;
+  player.maxMP = gd.maxMP ?? player.maxMP;
+  player.damage = gd.damage ?? player.damage;
+
+  // Safety: don't load into a dead state — heal to full
+  if (player.hp <= 0) player.hp = player.maxHP;
+  if (player.mp <= 0 && player.maxMP > 0) player.mp = player.maxMP;
+
+  player.baseHPFromClass = gd.baseHPFromClass ?? player.baseHPFromClass;
+  player.baseMPFromClass = gd.baseMPFromClass ?? player.baseMPFromClass;
+
+  player.facing = gd.facing ?? player.facing;
+
+  playerMesos = gd.mesos ?? playerMesos;
+
+  // Inventory
+  if (gd.inventory) {
+    for (const k of Object.keys(inv)) {
+      inv[k] = gd.inventory[k] ?? inv[k];
+    }
+  }
+
+  // Quest state restoration
+  if (gd.currentQuestId && questIndex.has(gd.currentQuestId)) {
+    questState.activeQuestId = gd.currentQuestId;
+    questState.activeQuest = questIndex.get(gd.currentQuestId);
+  }
+
+  if (gd.completedQuests && Array.isArray(gd.completedQuests)) {
+    questState.completed = new Set(gd.completedQuests);
+  }
+
+  if (gd.questProgress) {
+    questState.progress = {};
+    // Handle both Map and plain object from MongoDB
+    if (gd.questProgress instanceof Map) {
+      gd.questProgress.forEach((v, k) => { questState.progress[k] = v; });
+    } else {
+      Object.assign(questState.progress, gd.questProgress);
+    }
+  }
+
+  // Load the correct map
+  if (gd.currentQuestId) {
+    await loadMapForQuest(gd.currentQuestId);
+  }
+
+  // Restore position AFTER map is loaded
+  if (typeof gd.x === "number") player.x = gd.x;
+  if (typeof gd.y === "number") player.y = gd.y;
+  player.vy = 0;
+  player.onGround = true;
+
+  await refreshNeededAssets();
+}
+
+async function saveGameToServer() {
+  if (!authToken) return;
+  try {
+    const resp = await fetch(`${API_BASE}/game/save`, {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ gameData: collectGameData() }),
+    });
+    const data = await resp.json();
+    if (!resp.ok) {
+      addError("Save failed: " + (data.error || "unknown"));
+    } else {
+      addError("Game saved!");
+    }
+  } catch (err) {
+    addError("Save error: " + err.message);
+  }
+}
+
+async function loadGameFromServer() {
+  if (!authToken) return null;
+  try {
+    const resp = await fetch(`${API_BASE}/game/load`, {
+      headers: getAuthHeaders(),
+    });
+    const data = await resp.json();
+    if (!resp.ok) return null;
+    return data.gameData || null;
+  } catch {
+    return null;
+  }
+}
+
+function startAutoSave() {
+  if (autoSaveInterval) clearInterval(autoSaveInterval);
+  autoSaveInterval = setInterval(() => {
+    saveGameToServer();
+  }, 60_000); // save every 60 seconds
+}
+
+function stopAutoSave() {
+  if (autoSaveInterval) {
+    clearInterval(autoSaveInterval);
+    autoSaveInterval = null;
+  }
+}
 let mobs = [];
 let lastSpawnAt = 0;
 let damageTexts = [];
@@ -944,6 +1185,8 @@ function playerBox() {
   return playerBoxAt(player.x, player.y);
 }
 
+let playerDead = false;
+
 function hurtPlayerFromMob(m) {
   const t = nowMs();
 
@@ -952,6 +1195,60 @@ function hurtPlayerFromMob(m) {
   const dmg = getMobStat(m.id, "damage", 1);
   player.hp = Math.max(0, player.hp - dmg);
   player.lastHurtAt = t;
+
+  // ===== PLAYER DEATH =====
+  if (player.hp <= 0 && !playerDead) {
+    playerDead = true;
+    onPlayerDeath();
+  }
+}
+
+function onPlayerDeath() {
+  const overlay = document.getElementById("deathOverlay");
+  if (overlay) overlay.style.display = "flex";
+
+  // Clear all mobs and mesos on screen
+  mobs = [];
+  mesos = [];
+}
+
+async function respawnPlayer() {
+  playerDead = false;
+
+  const overlay = document.getElementById("deathOverlay");
+  if (overlay) overlay.style.display = "none";
+
+  // Reset quest progress (restart current quest)
+  if (questState && questState.activeQuest) {
+    questState.progress = {};
+    questReadyToClaim = false;
+  }
+
+  // Restore HP to full, lose 10% mesos as penalty
+  player.hp = player.maxHP;
+  player.mp = player.maxMP;
+  playerMesos = Math.floor(playerMesos * 0.9);
+
+  // Clear mobs
+  mobs = [];
+  mesos = [];
+
+  // Reload the map and reposition player
+  if (questState.activeQuestId) {
+    await loadMapForQuest(questState.activeQuestId);
+  }
+
+  const plat = WORLD.platforms[3] || WORLD.platforms[0];
+  player.y = plat.y - PLAYER_HITBOX.offsetY - PLAYER_HITBOX.h;
+  player.x = 120;
+  player.vy = 0;
+  player.onGround = true;
+
+  await refreshNeededAssets();
+
+  addError("You have respawned. Quest progress reset. Lost 10% mesos.");
+  updateStatsPanelText();
+  updateInvPanelText();
 }
 
 function onMobKilled(mobId) {
@@ -1642,6 +1939,21 @@ function render() {
     ctx.fillRect(sx, sy, sw, sh);
   }
 
+  // ===== PLAYER NAME ABOVE HEAD =====
+  if (currentUsername) {
+    const nameX = sx + sw / 2;
+    const nameY = sy - 6 * scaleY;
+    ctx.font = `bold ${Math.round(12 * scaleY)}px Arial`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "bottom";
+    ctx.fillStyle = "rgba(0,0,0,0.6)";
+    ctx.fillText(currentUsername, nameX + 1, nameY + 1);
+    ctx.fillStyle = "#ffffff";
+    ctx.fillText(currentUsername, nameX, nameY);
+    ctx.textAlign = "left";
+    ctx.textBaseline = "alphabetic";
+  }
+
 
   // ===== NPC DRAW =====
   const npcScale = 0.65;
@@ -1920,6 +2232,22 @@ function loop() {
     return;
   }
 
+  // ⛔ Freeze gameplay when dead
+  if (playerDead) {
+    render();
+    requestAnimationFrame(loop);
+    return;
+  }
+
+  // Safety: catch 0 HP even if hurtPlayerFromMob didn't trigger it
+  if (player.hp <= 0 && !playerDead) {
+    playerDead = true;
+    onPlayerDeath();
+    render();
+    requestAnimationFrame(loop);
+    return;
+  }
+
   updatePlayer(dt);
   updateMobs(dt);
   updateDamageTexts(dt);
@@ -1948,7 +2276,7 @@ window.addEventListener("keydown", (e) => {
     if (shopOpen) shopTab = 1;
   }
 
-  // Buy potions when shop is open
+  // Buy potions when shop is open, USE potions when shop closed
   if (shopOpen) {
     if (e.code === "Digit1") buyPotion("hp1");
     if (e.code === "Digit2") buyPotion("hp2");
@@ -1959,6 +2287,14 @@ window.addEventListener("keydown", (e) => {
     if (e.code === "Digit6") buyPotion("mp3");
 
     if (e.code === "Escape") shopOpen = false;
+  } else {
+    // Use potions from hotbar (keys 1-6)
+    if (e.code === "Digit1") usePotion("hp1");
+    if (e.code === "Digit2") usePotion("hp2");
+    if (e.code === "Digit3") usePotion("hp3");
+    if (e.code === "Digit4") usePotion("mp1");
+    if (e.code === "Digit5") usePotion("mp2");
+    if (e.code === "Digit6") usePotion("mp3");
   }
 });
 window.addEventListener("keyup", (e) => keys.delete(e.code));
@@ -2071,17 +2407,43 @@ async function boot() {
   }
 
   // ===== STATS UI EVENTS =====
+  UI.menuToggle?.addEventListener("click", () => {
+    UI.menuDropdown.classList.toggle("open");
+  });
+
+  // Close menu when clicking outside
+  document.addEventListener("click", (e) => {
+    if (UI.gameMenu && !UI.gameMenu.contains(e.target)) {
+      UI.menuDropdown?.classList.remove("open");
+    }
+  });
+
   UI.statsBtn?.addEventListener("click", () => {
-    UI.statsPanel.style.display =
-      UI.statsPanel.style.display === "block" ? "none" : "block";
+    UI.menuDropdown?.classList.remove("open");
+    const show = UI.statsPanel.style.display !== "block";
+    UI.statsPanel.style.display = show ? "block" : "none";
+    if (show) UI.invPanel.style.display = "none";
   });
 
   // ✅ INVENTORY BUTTON EVENT
-  UI.invBtn?.addEventListener("click", toggleInv);
+  UI.invBtn?.addEventListener("click", () => {
+    UI.menuDropdown?.classList.remove("open");
+    const show = UI.invPanel.style.display !== "block";
+    UI.invPanel.style.display = show ? "block" : "none";
+    if (show) {
+      UI.statsPanel.style.display = "none";
+      updateInvPanelText();
+    }
+  });
 
   // ✅ Claim quest reward by clicking the quest progress text
 
   let claimingQuest = false;
+
+  // ===== RESPAWN BUTTON =====
+  UI.respawnBtn?.addEventListener("click", () => {
+    respawnPlayer();
+  });
 
   UI.hud?.addEventListener("click", async () => {
     if (!questReadyToClaim) return;
@@ -2114,22 +2476,59 @@ async function boot() {
   loadMesoFrames();
 
 
-  // ===== LOGIN SYSTEM =====
-  function doLogin(username) {
+  // ===== LOGIN SYSTEM (MongoDB) =====
+  function showGameUI() {
     isLoggedIn = true;
-
     if (UI.loginScreen) UI.loginScreen.style.display = "none";
-
-    // ✅ להחזיר UI אחרי login
     if (UI.hud) UI.hud.style.display = "block";
-    if (UI.statsBtn) UI.statsBtn.style.display = "block";
-    if (UI.invBtn) UI.invBtn.style.display = "block";
-
-    localStorage.setItem("maple_user", username);
+    if (UI.gameMenu) UI.gameMenu.style.display = "block";
     if (UI.loginMsg) UI.loginMsg.textContent = "";
   }
 
-  UI.loginBtn?.addEventListener("click", () => {
+  function hideGameUI() {
+    isLoggedIn = false;
+    if (UI.loginScreen) UI.loginScreen.style.display = "flex";
+    if (UI.hud) UI.hud.style.display = "none";
+    if (UI.gameMenu) UI.gameMenu.style.display = "none";
+    if (UI.statsPanel) UI.statsPanel.style.display = "none";
+    if (UI.invPanel) UI.invPanel.style.display = "none";
+  }
+
+  async function doLogin(token, username) {
+    authToken = token;
+    currentUsername = username;
+    localStorage.setItem("maple_token", token);
+    localStorage.setItem("maple_user", username);
+
+    showGameUI();
+
+    // Load saved game data from server
+    const gd = await loadGameFromServer();
+    if (gd) {
+      await applyGameData(gd);
+      addError(`Welcome back, ${username}! Game data loaded.`);
+    } else {
+      addError(`Welcome, ${username}! Starting fresh.`);
+    }
+
+    startAutoSave();
+  }
+
+  function doLogout() {
+    stopAutoSave();
+    // Save before logging out
+    saveGameToServer();
+
+    authToken = null;
+    currentUsername = null;
+    localStorage.removeItem("maple_token");
+    localStorage.removeItem("maple_user");
+
+    hideGameUI();
+  }
+
+  // ── Login button ──
+  UI.loginBtn?.addEventListener("click", async () => {
     const user = UI.loginUser?.value.trim();
     const pass = UI.loginPass?.value.trim();
 
@@ -2138,26 +2537,80 @@ async function boot() {
       return;
     }
 
-    doLogin(user);
+    if (UI.loginMsg) UI.loginMsg.textContent = "Logging in...";
+
+    try {
+      const resp = await fetch(`${API_BASE}/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: user, password: pass }),
+      });
+      const data = await resp.json();
+
+      if (!resp.ok) {
+        if (UI.loginMsg) UI.loginMsg.textContent = data.error || "Login failed.";
+        return;
+      }
+
+      await doLogin(data.token, user);
+    } catch (err) {
+      if (UI.loginMsg) UI.loginMsg.textContent = "Connection error: " + err.message;
+    }
   });
 
-  UI.googleBtn?.addEventListener("click", () => {
-    doLogin("google_user");
+  // ── Register button ──
+  UI.registerBtn?.addEventListener("click", async () => {
+    const user  = UI.loginUser?.value.trim();
+    const email = UI.loginEmail?.value.trim();
+    const pass  = UI.loginPass?.value.trim();
+
+    if (!user || !email || !pass) {
+      if (UI.loginMsg) UI.loginMsg.textContent = "All fields are required.";
+      return;
+    }
+
+    if (UI.loginMsg) UI.loginMsg.textContent = "Creating account...";
+
+    try {
+      const resp = await fetch(`${API_BASE}/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: user, email, password: pass }),
+      });
+      const data = await resp.json();
+
+      if (!resp.ok) {
+        if (UI.loginMsg) UI.loginMsg.textContent = data.error || "Registration failed.";
+        return;
+      }
+
+      await doLogin(data.token, user);
+    } catch (err) {
+      if (UI.loginMsg) UI.loginMsg.textContent = "Connection error: " + err.message;
+    }
   });
 
-  // Auto-login if already saved
-  const savedUser = localStorage.getItem("maple_user");
+  // ── Save button ──
+  UI.saveBtn?.addEventListener("click", () => {
+    UI.menuDropdown?.classList.remove("open");
+    saveGameToServer();
+  });
 
-  if (savedUser) {
-    doLogin(savedUser);
+  // ── Logout button ──
+  UI.logoutBtn?.addEventListener("click", () => {
+    UI.menuDropdown?.classList.remove("open");
+    doLogout();
+  });
+
+  // ── Auto-login with existing token ──
+  const savedToken = localStorage.getItem("maple_token");
+  const savedUser  = localStorage.getItem("maple_user");
+
+  if (savedToken && savedUser) {
+    authToken = savedToken;
+    await doLogin(savedToken, savedUser);
   } else {
-    // להציג login
-    if (UI.loginScreen) UI.loginScreen.style.display = "flex";
-
-    // 🔒 להסתיר UI בזמן login
-    if (UI.hud) UI.hud.style.display = "none";
-    if (UI.statsBtn) UI.statsBtn.style.display = "none";
-    if (UI.invBtn) UI.invBtn.style.display = "none";
+    hideGameUI();
   }
 
   requestAnimationFrame(loop);
