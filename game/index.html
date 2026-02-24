@@ -1,76 +1,53 @@
 <!doctype html>
 <html lang="en">
-
 <head>
   <meta charset="utf-8" />
   <title>Maple Mini RPG</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <style>
-    * {
-      box-sizing: border-box;
-    }
+    * { box-sizing: border-box; }
 
-    html,
-    body {
-      margin: 0;
-      padding: 0;
-      width: 100%;
-      height: 100%;
-      overflow: hidden;
-      background: #111;
-      color: #eee;
+    html, body {
+      margin:0;
+      padding:0;
+      width:100%;
+      height:100%;
+      overflow:hidden;
+      background:#111;
+      color:#eee;
       font-family: Arial, sans-serif;
     }
 
 <<<<<<< HEAD
 =======
     canvas {
-      display: block;
-      width: 100%;
-      height: 100%;
-      background: #1b1b1b;
+      display:block;
+      width:100%;
+      height:100%;
+      background:#1b1b1b;
     }
 
     /* ===== HUD ===== */
 >>>>>>> 7d071832341609bee800187d758d7c3e9c3e55b1
     #hud {
-      position: fixed;
-      top: 10px;
-      left: 10px;
-      z-index: 100;
-      background: rgba(0, 0, 0, .6);
-      padding: 12px;
-      border-radius: 10px;
-      max-width: 520px;
-      max-height: 80vh;
-      overflow-y: auto;
-      display: none;
+      position:fixed;
+      top:10px;
+      left:10px;
+      z-index:100;
+      background:rgba(0,0,0,.6);
+      padding:12px;
+      border-radius:10px;
+      max-width:520px;
+      max-height:80vh;
+      overflow-y:auto;
     }
 
-    #questTitle {
-      font-weight: 700;
-      margin-bottom: 6px;
-    }
-
-    #questDesc {
-      margin-bottom: 8px;
-    }
-
-    #questProgress {
-      margin-bottom: 6px;
-    }
-
-    #playerStats {
-      margin-top: 8px;
-    }
-
-    #errors {
-      margin-top: 8px;
-      color: #ffb3b3;
-      white-space: pre-wrap;
-      font-size: 13px;
-    }
+    #questTitle { font-weight:700; margin-bottom:6px; }
+    #questDesc { margin-bottom:8px; }
+    #questProgress { margin-bottom:6px; }
+    #playerStats { margin-top:8px; }
+    #errors { margin-top:8px; color:#ffb3b3; white-space:pre-wrap; font-size:13px; }
 
     canvas {
       display:block;
@@ -80,9 +57,9 @@
     }
 
     .small {
-      font-size: 13px;
-      opacity: .8;
-      margin-top: 6px;
+      font-size:13px;
+      opacity:.8;
+      margin-top:6px;
     }
 
 <<<<<<< HEAD
@@ -101,15 +78,12 @@
       cursor: pointer;
       border: none;
       border-radius: 8px;
-      background: rgba(0, 0, 0, 0.65);
+      background: rgba(0,0,0,0.65);
       color: white;
       font-weight: bold;
       letter-spacing: 1px;
     }
-
-    #menuToggle:hover {
-      background: rgba(0, 0, 0, 0.8);
-    }
+    #menuToggle:hover { background: rgba(0,0,0,0.8); }
 
     #menuDropdown {
       display: none;
@@ -117,16 +91,13 @@
       top: 42px;
       right: 0;
       min-width: 150px;
-      background: rgba(10, 10, 18, 0.92);
-      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(10,10,18,0.92);
+      border: 1px solid rgba(255,255,255,0.12);
       border-radius: 10px;
-      box-shadow: 0 8px 28px rgba(0, 0, 0, 0.6);
+      box-shadow: 0 8px 28px rgba(0,0,0,0.6);
       overflow: hidden;
     }
-
-    #menuDropdown.open {
-      display: block;
-    }
+    #menuDropdown.open { display: block; }
 
     .menuItem {
       display: block;
@@ -141,22 +112,13 @@
       cursor: pointer;
       transition: background 0.15s;
     }
-
-    .menuItem:hover {
-      background: rgba(255, 255, 255, 0.1);
-    }
-
-    .menuItem.danger {
-      color: #ff6b6b;
-    }
-
-    .menuItem.save {
-      color: #f9ca24;
-    }
+    .menuItem:hover { background: rgba(255,255,255,0.1); }
+    .menuItem.danger { color: #ff6b6b; }
+    .menuItem.save   { color: #f9ca24; }
 
     .menuDivider {
       height: 1px;
-      background: rgba(255, 255, 255, 0.1);
+      background: rgba(255,255,255,0.1);
       margin: 2px 0;
     }
 
@@ -168,11 +130,11 @@
       z-index: 290;
       width: 260px;
       padding: 14px;
-      background: rgba(10, 10, 18, 0.92);
-      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(10,10,18,0.92);
+      border: 1px solid rgba(255,255,255,0.12);
       border-radius: 12px;
       display: none;
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.5);
     }
 
     #statsButtons {
@@ -194,72 +156,18 @@
     /* ===== INVENTORY PANEL ===== */
     #invPanel {
       position: fixed;
-      top: 100px;
-      left: 50%;
+      top: 56px;
+      right: 10px;
       z-index: 290;
       width: 280px;
       padding: 14px;
-      background: rgba(10, 10, 18, 0.92);
-      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(10,10,18,0.92);
+      border: 1px solid rgba(255,255,255,0.12);
       border-radius: 12px;
       display: none;
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.5);
       max-height: 70vh;
       overflow-y: auto;
-      cursor: grab;
-      user-select: none;
-      transform: translateX(calc(-50% - 150px));
-    }
-
-    /* ===== WARDROBE PANEL ===== */
-    #wardrobePanel {
-      position: fixed;
-      top: 100px;
-      left: 50%;
-      z-index: 290;
-      width: 320px;
-      padding: 14px;
-      background: rgba(10, 10, 18, 0.92);
-      border: 1px solid rgba(255, 215, 0, 0.3);
-      border-radius: 12px;
-      display: none;
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
-      max-height: 70vh;
-      overflow-y: auto;
-      cursor: grab;
-      user-select: none;
-      transform: translateX(calc(-50% + 150px));
-    }
-
-    #wardrobePanel h3 {
-      color: #FFD700;
-      margin-top: 0;
-      margin-bottom: 12px;
-      border-bottom: 1px solid rgba(255, 215, 0, 0.3);
-      padding-bottom: 8px;
-      cursor: grab;
-    }
-
-    #wardrobePanel h3:active,
-    #invPanel h2:active {
-      cursor: grabbing;
-    }
-
-    .wardrobe-item {
-      transition: all 0.2s ease;
-    }
-
-    .wardrobe-item:hover {
-      background: rgba(255, 215, 0, 0.2) !important;
-      transform: scale(1.02);
-    }
-
-    .wardrobe-empty {
-      display: flex !important;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      min-height: 80px;
     }
 
     .inv-potion-row {
@@ -267,31 +175,12 @@
       align-items: center;
       gap: 8px;
       padding: 5px 0;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      border-bottom: 1px solid rgba(255,255,255,0.06);
     }
-
-    .inv-potion-row:last-child {
-      border-bottom: none;
-    }
-
-    .inv-potion-row img {
-      width: 28px;
-      height: 28px;
-      image-rendering: pixelated;
-    }
-
-    .inv-potion-name {
-      flex: 1;
-      font-size: 13px;
-    }
-
-    .inv-potion-qty {
-      font-size: 13px;
-      opacity: 0.7;
-      min-width: 30px;
-      text-align: right;
-    }
-
+    .inv-potion-row:last-child { border-bottom: none; }
+    .inv-potion-row img { width: 28px; height: 28px; image-rendering: pixelated; }
+    .inv-potion-name { flex: 1; font-size: 13px; }
+    .inv-potion-qty { font-size: 13px; opacity: 0.7; min-width: 30px; text-align: right; }
     .inv-use-btn {
       padding: 4px 10px;
       border: none;
@@ -302,23 +191,10 @@
       font-size: 12px;
       cursor: pointer;
     }
-
-    .inv-use-btn:disabled {
-      opacity: 0.3;
-      cursor: default;
-    }
-
-    .inv-use-btn:hover:not(:disabled) {
-      background: #27ae60;
-    }
-
-    .inv-use-btn.mp {
-      background: #3498db;
-    }
-
-    .inv-use-btn.mp:hover:not(:disabled) {
-      background: #2980b9;
-    }
+    .inv-use-btn:disabled { opacity: 0.3; cursor: default; }
+    .inv-use-btn:hover:not(:disabled) { background: #27ae60; }
+    .inv-use-btn.mp { background: #3498db; }
+    .inv-use-btn.mp:hover:not(:disabled) { background: #2980b9; }
 
     /* ===== DEATH OVERLAY ===== */
     #deathOverlay {
@@ -329,23 +205,20 @@
       align-items: center;
       justify-content: center;
       flex-direction: column;
-      background: rgba(0, 0, 0, 0.75);
+      background: rgba(0,0,0,0.75);
       color: white;
     }
-
     #deathOverlay h1 {
       font-size: 48px;
       color: #e74c3c;
       margin-bottom: 12px;
-      text-shadow: 0 0 20px rgba(231, 76, 60, 0.6);
+      text-shadow: 0 0 20px rgba(231,76,60,0.6);
     }
-
     #deathOverlay p {
       font-size: 18px;
       opacity: 0.85;
       margin-bottom: 24px;
     }
-
     #respawnBtn {
       padding: 14px 32px;
       font-size: 16px;
@@ -356,10 +229,7 @@
       color: white;
       cursor: pointer;
     }
-
-    #respawnBtn:hover {
-      background: #c0392b;
-    }
+    #respawnBtn:hover { background: #c0392b; }
 
     /* ============================= */
     /* ===== LOGIN SCREEN ===== */
@@ -398,10 +268,10 @@
     #loginBox {
       width: 360px;
       padding: 22px;
-      background: rgba(0, 0, 0, 0.55);
-      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(0,0,0,0.55);
+      border: 1px solid rgba(255,255,255,0.12);
       border-radius: 14px;
-      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55);
+      box-shadow: 0 12px 40px rgba(0,0,0,0.55);
       text-align: center;
 >>>>>>> 7d071832341609bee800187d758d7c3e9c3e55b1
     }
@@ -484,8 +354,8 @@
       padding: 12px;
       margin: 6px 0;
       border-radius: 10px;
-      border: 1px solid rgba(255, 255, 255, 0.18);
-      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255,255,255,0.18);
+      background: rgba(255,255,255,0.08);
       color: white;
       outline: none;
     }
@@ -526,7 +396,6 @@
       margin-bottom: 16px;
       gap: 0;
     }
-
     .authTab {
       flex: 1;
       padding: 10px;
@@ -534,125 +403,21 @@
       cursor: pointer;
       font-weight: 700;
       font-size: 15px;
-      background: rgba(255, 255, 255, 0.06);
-      color: rgba(255, 255, 255, 0.5);
+      background: rgba(255,255,255,0.06);
+      color: rgba(255,255,255,0.5);
       transition: all 0.2s;
     }
-
-    .authTab:first-child {
-      border-radius: 8px 0 0 8px;
-    }
-
-    .authTab:last-child {
-      border-radius: 0 8px 8px 0;
-    }
-
+    .authTab:first-child { border-radius: 8px 0 0 8px; }
+    .authTab:last-child  { border-radius: 0 8px 8px 0; }
     .authTab.active {
-      background: rgba(255, 255, 255, 0.15);
+      background: rgba(255,255,255,0.15);
       color: white;
     }
 
-    #emailRow {
-      display: none;
-    }
+    #emailRow { display: none; }
 
-    /* ============================= */
-    /* ===== CLASS SELECT SCREEN ==== */
-    /* ============================= */
 
-    #classScreen {
-      position: fixed;
-      inset: 0;
-      z-index: 9998;
-      /* מתחת ללוגין (9999), מעל המשחק */
-      display: none;
-      align-items: center;
-      justify-content: center;
-      background: radial-gradient(circle at top, #2a2f6b, #050814);
-      color: white;
-    }
 
-    #classBox {
-      width: min(920px, 92vw);
-      padding: 22px;
-      background: rgba(0, 0, 0, 0.55);
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      border-radius: 14px;
-      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55);
-      text-align: center;
-    }
-
-    #classTitle {
-      font-size: 28px;
-      font-weight: 800;
-      margin-bottom: 8px;
-    }
-
-    #classSub {
-      opacity: 0.85;
-      margin-bottom: 18px;
-    }
-
-    .classGrid {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 14px;
-    }
-
-    @media (max-width: 720px) {
-      .classGrid {
-        grid-template-columns: 1fr;
-      }
-    }
-
-    .classCard {
-      padding: 14px;
-      border-radius: 14px;
-      border: 1px solid rgba(255, 255, 255, 0.14);
-      background: rgba(255, 255, 255, 0.06);
-      cursor: pointer;
-      transition: transform .15s, background .15s, border-color .15s;
-      text-align: left;
-    }
-
-    .classCard:hover {
-      transform: translateY(-2px);
-      background: rgba(255, 255, 255, 0.10);
-      border-color: rgba(255, 255, 255, 0.25);
-    }
-
-    .className {
-      font-weight: 800;
-      font-size: 18px;
-      margin-bottom: 6px;
-    }
-
-    .classDesc {
-      font-size: 13px;
-      opacity: 0.85;
-      line-height: 1.35;
-      margin-bottom: 10px;
-    }
-
-    .classStats {
-      font-size: 13px;
-      opacity: 0.95;
-      display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
-    }
-
-    .classHint {
-      margin-top: 14px;
-      font-size: 12px;
-      opacity: 0.65;
-    }
-
-    #classMsg {
-      margin-top: 10px;
-      color: #ffcc66;
-      min-height: 18px;
-    }
   </style>
 </head>
 
@@ -684,69 +449,6 @@
     </div>
   </div>
 
-  <!-- CLASS SELECTION OVERLAY -->
-  <div id="classScreen">
-    <div id="classBox">
-      <div id="classTitle">Choose Your Class</div>
-      <div id="classSub">Pick a class to start your adventure</div>
-
-      <div class="classGrid">
-        <div class="classCard" onclick="chooseClassUI('warrior')">
-          <div class="className">⚔️ Warrior</div>
-          <div class="classDesc">Tanky melee. High HP and STR.</div>
-          <div class="classStats">
-            <div>STR: ★★★★☆</div>
-            <div>VIT: ★★★★☆</div>
-            <div>INT: ★☆☆☆☆</div>
-          </div>
-        </div>
-
-        <div class="classCard" onclick="chooseClassUI('mage')">
-          <div class="className">🪄 Mage</div>
-          <div class="classDesc">Magic DPS. Big INT, fragile early.</div>
-          <div class="classStats">
-            <div>STR: ★☆☆☆☆</div>
-            <div>VIT: ★★☆☆☆</div>
-            <div>INT: ★★★★★</div>
-          </div>
-        </div>
-
-        <div class="classCard" onclick="chooseClassUI('archer')">
-          <div class="className">🏹 Archer</div>
-          <div class="classDesc">Ranged fighter. Balanced and fast.</div>
-          <div class="classStats">
-            <div>STR: ★★★☆☆</div>
-            <div>VIT: ★★★☆☆</div>
-            <div>INT: ★★☆☆☆</div>
-          </div>
-        </div>
-
-        <div class="classCard" onclick="chooseClassUI('thief')">
-          <div class="className">🗡️ Thief</div>
-          <div class="classDesc">Fast attacker. High DEX and crit style.</div>
-          <div class="classStats">
-            <div>STR: ★★☆☆☆</div>
-            <div>VIT: ★★☆☆☆</div>
-            <div>DEX: ★★★★★</div>
-          </div>
-        </div>
-
-        <div class="classCard" onclick="chooseClassUI('pirate')">
-          <div class="className">🔫 Pirate</div>
-          <div class="classDesc">Hybrid fighter. Balanced and aggressive.</div>
-          <div class="classStats">
-            <div>STR: ★★★★☆</div>
-            <div>VIT: ★★★☆☆</div>
-            <div>DEX: ★★★★☆</div>
-          </div>
-        </div>
-      </div>
-
-      <div id="classMsg"></div>
-      <div class="classHint">Tip: You can add more classes later easily.</div>
-    </div>
-  </div>
-
   <!-- HUD -->
 =======
 >>>>>>> parent of 3edecf82 (I built a proper class system with a structured CLASS_DB, where each class actually affects HP, MP, stats, and real damage calculations — not just visuals. I upgraded the HUD to display working MP, added smooth stage transitions, and improved visuals by adding mob shadows for better depth.)
@@ -766,7 +468,6 @@
     <div id="menuDropdown">
       <button class="menuItem" id="statsBtn">📊 Stats</button>
       <button class="menuItem" id="invBtn">🎒 Inventory</button>
-      <button class="menuItem" id="wardrobeBtn">👗 Wardrobe</button>
       <div class="menuDivider"></div>
       <button class="menuItem save" id="saveBtn">💾 Save Game</button>
       <button class="menuItem danger" id="logoutBtn">🚪 Logout</button>
@@ -785,9 +486,6 @@
     <div id="statsButtons">
       <button id="btnAddSTR">+ STR</button>
       <button id="btnAddVIT">+ VIT</button>
-      <button id="btnAddDEX">+ DEX</button>
-      <button id="btnAddINT">+ INT</button>
-      <button id="btnAddLUK">+ LUK</button>
     </div>
 
     <div style="margin-top:8px; font-size:12px; opacity:.8;">
@@ -810,17 +508,6 @@
     <div style="margin-top:8px; font-size:12px; opacity:0.5;">Keys 1-6 to use potions</div>
   </div>
 
-  <!-- WARDROBE PANEL -->
-  <div id="wardrobePanel">
-    <h3>👗 Wardrobe</h3>
-    <div id="wardrobeContent" style="padding: 8px 0;">
-      <!-- Items will be populated here -->
-    </div>
-    <div style="margin-top: 12px; padding-top: 8px; border-top: 1px solid #555; font-size: 12px; opacity: 0.7;">
-      💡 Drag scrolls here to upgrade gear
-    </div>
-  </div>
-
   <!-- DEATH OVERLAY -->
   <div id="deathOverlay">
     <h1>YOU DIED</h1>
@@ -839,23 +526,23 @@
   <script>
     // ── Auth tab switching (runs before game.js) ──
     function switchAuthTab(tab) {
-      const tabLogin = document.getElementById("tabLogin");
+      const tabLogin    = document.getElementById("tabLogin");
       const tabRegister = document.getElementById("tabRegister");
-      const emailRow = document.getElementById("emailRow");
-      const loginBtn = document.getElementById("loginBtn");
+      const emailRow    = document.getElementById("emailRow");
+      const loginBtn    = document.getElementById("loginBtn");
       const registerBtn = document.getElementById("registerBtn");
 
       if (tab === "register") {
         tabRegister.classList.add("active");
         tabLogin.classList.remove("active");
-        emailRow.style.display = "block";
-        loginBtn.style.display = "none";
+        emailRow.style.display    = "block";
+        loginBtn.style.display    = "none";
         registerBtn.style.display = "block";
       } else {
         tabLogin.classList.add("active");
         tabRegister.classList.remove("active");
-        emailRow.style.display = "none";
-        loginBtn.style.display = "block";
+        emailRow.style.display    = "none";
+        loginBtn.style.display    = "block";
         registerBtn.style.display = "none";
       }
       document.getElementById("loginMsg").textContent = "";
@@ -866,8 +553,12 @@
 
 </body>
 <<<<<<< HEAD
+<<<<<<< HEAD
 </html>
 =======
 
 </html>
 >>>>>>> 7d071832341609bee800187d758d7c3e9c3e55b1
+=======
+</html>
+>>>>>>> parent of 7d071832 (add)
