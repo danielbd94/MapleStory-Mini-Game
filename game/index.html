@@ -19,14 +19,6 @@
       font-family: Arial, sans-serif;
     }
 
-    canvas {
-      display:block;
-      width:100%;
-      height:100%;
-      background:#1b1b1b;
-    }
-
-    /* ===== HUD ===== */
     #hud {
       position:fixed;
       top:10px;
@@ -46,12 +38,20 @@
     #playerStats { margin-top:8px; }
     #errors { margin-top:8px; color:#ffb3b3; white-space:pre-wrap; font-size:13px; }
 
+    canvas {
+      display:block;
+      width:100%;
+      height:100%;
+      background:#1b1b1b;
+    }
+
     .small {
       font-size:13px;
       opacity:.8;
       margin-top:6px;
     }
 
+<<<<<<< HEAD
     /* ===== TOP-RIGHT MENU ===== */
     #gameMenu {
       position: fixed;
@@ -223,28 +223,99 @@
     /* ============================= */
     /* ===== LOGIN SCREEN ===== */
     /* ============================= */
-
-    #loginScreen {
-      position: fixed;
-      inset: 0;
-      z-index: 9999;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: radial-gradient(circle at top, #1b2a5c, #050814);
-      color: white;
+=======
+    /* ===== STATS BUTTON ===== */
+    #statsBtn {
+      position:fixed;
+      right:15px;
+      bottom:15px;
+      z-index:200;
+      padding:10px 14px;
+      font-size:14px;
+      cursor:pointer;
+      border:none;
+      border-radius:8px;
+      background:#2d7cff;
+      color:white;
+      font-weight:bold;
     }
 
-    #loginBox {
-      width: 360px;
-      padding: 22px;
-      background: rgba(0,0,0,0.55);
-      border: 1px solid rgba(255,255,255,0.12);
-      border-radius: 14px;
-      box-shadow: 0 12px 40px rgba(0,0,0,0.55);
-      text-align: center;
+    /* ===== STATS PANEL ===== */
+    #statsPanel {
+      position:fixed;
+      right:15px;
+      bottom:65px;
+      z-index:200;
+      width:260px;
+      padding:14px;
+      background:rgba(0,0,0,0.85);
+      border-radius:12px;
+      display:none;
+      box-shadow:0 0 15px rgba(0,0,0,0.6);
     }
 
+    #statsPanel h3 {
+      margin:0 0 8px 0;
+      font-size:16px;
+    }
+
+    #statsPanel button {
+      cursor:pointer;
+      padding:6px;
+      border-radius:6px;
+      border:none;
+      background:#444;
+      color:white;
+      font-weight:bold;
+    }
+
+    #statsPanel button:hover {
+      background:#666;
+    }
+
+    #statsButtons {
+      display:flex;
+      gap:8px;
+      margin-top:10px;
+    }
+
+    /* ===== INVENTORY BUTTON ===== */
+#invBtn {
+  position: fixed;
+  right: 15px;
+  bottom: 115px;
+  z-index: 200;
+  padding: 10px 14px;
+  font-size: 14px;
+  cursor: pointer;
+  border: none;
+  border-radius: 8px;
+  background: #00b36b;
+  color: white;
+  font-weight: bold;
+}
+>>>>>>> parent of 3edecf82 (I built a proper class system with a structured CLASS_DB, where each class actually affects HP, MP, stats, and real damage calculations — not just visuals. I upgraded the HUD to display working MP, added smooth stage transitions, and improved visuals by adding mob shadows for better depth.)
+
+/* ===== INVENTORY PANEL ===== */
+#invPanel {
+  position: fixed;
+  right: 15px;
+  bottom: 165px;
+  z-index: 200;
+  width: 260px;
+  padding: 14px;
+  background: rgba(0,0,0,0.85);
+  border-radius: 12px;
+  display: none;
+  box-shadow: 0 0 15px rgba(0,0,0,0.6);
+}
+
+#invPanel h3 {
+  margin: 0 0 8px 0;
+  font-size: 16px;
+}
+
+<<<<<<< HEAD
     #loginTitle {
       font-size: 28px;
       font-weight: 800;
@@ -294,6 +365,8 @@
       color: #ffcc66;
       min-height: 18px;
     }
+=======
+>>>>>>> parent of 3edecf82 (I built a proper class system with a structured CLASS_DB, where each class actually affects HP, MP, stats, and real damage calculations — not just visuals. I upgraded the HUD to display working MP, added smooth stage transitions, and improved visuals by adding mob shadows for better depth.)
 
     /* ===== AUTH TABS ===== */
     .authTabs {
@@ -328,6 +401,7 @@
 
 <body>
 
+<<<<<<< HEAD
   <!-- LOGIN / REGISTER OVERLAY -->
   <div id="loginScreen">
     <div id="loginBox">
@@ -354,6 +428,8 @@
   </div>
 
   <!-- HUD -->
+=======
+>>>>>>> parent of 3edecf82 (I built a proper class system with a structured CLASS_DB, where each class actually affects HP, MP, stats, and real damage calculations — not just visuals. I upgraded the HUD to display working MP, added smooth stage transitions, and improved visuals by adding mob shadows for better depth.)
   <div id="hud">
     <div id="questTitle"></div>
     <div id="questDesc"></div>
@@ -363,6 +439,7 @@
     <div id="errors"></div>
   </div>
 
+<<<<<<< HEAD
   <!-- TOP-RIGHT MENU -->
   <div id="gameMenu">
     <button id="menuToggle">☰ Menu</button>
@@ -374,21 +451,37 @@
       <button class="menuItem danger" id="logoutBtn">🚪 Logout</button>
     </div>
   </div>
+=======
+  <!-- STATS BUTTON -->
+  <button id="statsBtn">Stats</button>
+>>>>>>> parent of 3edecf82 (I built a proper class system with a structured CLASS_DB, where each class actually affects HP, MP, stats, and real damage calculations — not just visuals. I upgraded the HUD to display working MP, added smooth stage transitions, and improved visuals by adding mob shadows for better depth.)
 
   <!-- STATS PANEL -->
   <div id="statsPanel">
     <h3>Player Stats</h3>
     <div id="statsInfo"></div>
+
     <div id="statsButtons">
       <button id="btnAddSTR">+ STR</button>
       <button id="btnAddVIT">+ VIT</button>
     </div>
+
+    <div style="margin-top:8px; font-size:12px; opacity:.8;">
+      Spend your SP here.
+    </div>
   </div>
 
+<<<<<<< HEAD
+=======
+    <!-- INVENTORY BUTTON -->
+  <button id="invBtn">Inventory</button>
+
+>>>>>>> parent of 3edecf82 (I built a proper class system with a structured CLASS_DB, where each class actually affects HP, MP, stats, and real damage calculations — not just visuals. I upgraded the HUD to display working MP, added smooth stage transitions, and improved visuals by adding mob shadows for better depth.)
   <!-- INVENTORY PANEL -->
   <div id="invPanel">
     <h3>Inventory</h3>
     <div id="invInfo">Mesos: 0</div>
+<<<<<<< HEAD
     <div id="invPotions"></div>
     <div style="margin-top:8px; font-size:12px; opacity:0.5;">Keys 1-6 to use potions</div>
   </div>
@@ -398,7 +491,13 @@
     <h1>YOU DIED</h1>
     <p>Your quest progress has been reset.</p>
     <button id="respawnBtn">Respawn</button>
+=======
+    <div style="margin-top:8px; font-size:12px; opacity:.8;">
+      Press I to open.
+    </div>
+>>>>>>> parent of 3edecf82 (I built a proper class system with a structured CLASS_DB, where each class actually affects HP, MP, stats, and real damage calculations — not just visuals. I upgraded the HUD to display working MP, added smooth stage transitions, and improved visuals by adding mob shadows for better depth.)
   </div>
+
 
   <canvas id="c"></canvas>
 
