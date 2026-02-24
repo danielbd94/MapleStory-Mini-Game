@@ -1,5 +1,43 @@
 const canvas = document.getElementById("c");
 const ctx = canvas.getContext("2d");
+
+// ===== GAME FLOW (Login -> Class Select -> Playing) =====
+let gameState = "login";
+
+const FLOW = {
+  login: document.getElementById("loginScreen"),
+  class: document.getElementById("classScreen"),
+  hud: document.getElementById("hud"),
+  menu: document.getElementById("gameMenu"),
+};
+
+function showLogin() {
+  gameState = "login";
+  FLOW.login.style.display = "flex";
+  FLOW.class.style.display = "none";
+  FLOW.hud.style.display = "none";
+  FLOW.menu.style.display = "none";
+}
+
+function showClassSelect() {
+  gameState = "classSelect";
+  FLOW.login.style.display = "none";
+  FLOW.class.style.display = "flex";
+  FLOW.hud.style.display = "none";
+  FLOW.menu.style.display = "none";
+}
+
+function startPlaying() {
+  gameState = "playing";
+  FLOW.login.style.display = "none";
+  FLOW.class.style.display = "none";
+  FLOW.hud.style.display = "block";
+  FLOW.menu.style.display = "block";
+}
+
+// מצב פתיחה בטוח
+showLogin();
+
 ctx.imageSmoothingEnabled = false;
 
 // Original design size for scaling calculations
@@ -34,12 +72,20 @@ const UI = {
   statsInfo: document.getElementById("statsInfo"),
   btnAddSTR: document.getElementById("btnAddSTR"),
   btnAddVIT: document.getElementById("btnAddVIT"),
+  btnAddDEX: document.getElementById("btnAddDEX"),
+  btnAddINT: document.getElementById("btnAddINT"),
+  btnAddLUK: document.getElementById("btnAddLUK"),
 
   // ✅ INVENTORY
   invBtn: document.getElementById("invBtn"),
   invPanel: document.getElementById("invPanel"),
   invInfo: document.getElementById("invInfo"),
 <<<<<<< HEAD
+
+  // ✅ WARDROBE
+  wardrobeBtn: document.getElementById("wardrobeBtn"),
+  wardrobePanel: document.getElementById("wardrobePanel"),
+  wardrobeContent: document.getElementById("wardrobeContent"),
 
   // ===== TOP-RIGHT MENU =====
   gameMenu: document.getElementById("gameMenu"),
@@ -108,6 +154,7 @@ let PATHS = {
   statsPrimary: `./assets/data/mobs_stats.json`,
   statsFallback: `./assets/data/mobs_stats.json`,
   quests: `./data/quests.json`,
+  items: `./data/items.json`,
   mapBg: `./assets/maps/farm.png`,
 
   frame: (mobId, anim, frameIndex) => {
@@ -265,15 +312,69 @@ function expNeededForLevel(lv) {
   return Math.floor(30 + (lv - 1) * 18 + (lv - 1) * (lv - 1) * 6);
 }
 
+<<<<<<< HEAD
+=======
+function getClassData(player) {
+  return CLASS_DB[player.class] || CLASS_DB.warrior;
+}
+
+function applyClassBase(player, classKey) {
+  const c = CLASS_DB[classKey];
+  if (!c) throw new Error("Invalid class: " + classKey);
+
+  player.class = classKey;
+
+
+  // בסיס סטטים
+  player.str = c.baseStats.str;
+  player.vit = c.baseStats.vit;
+
+  // להכנה לעתיד (לא שובר כלום)
+  player.dex = c.baseStats.dex;
+  player.int = c.baseStats.int;
+  player.luk = c.baseStats.luk;
+
+  // בסיס HP/MP
+  player.baseHPFromClass = c.baseHP;
+  player.baseMPFromClass = c.baseMP;
+
+  // מערכת MP בסיסית
+  player.maxMP = c.baseMP;
+  player.mp = c.baseMP;
+}
+>>>>>>> 7d071832341609bee800187d758d7c3e9c3e55b1
 
 function applyLevelStats() {
   // STR מעלה דמג'
   // STR raises damage: +1 damage per STR point
   player.damage = CONFIG.playerDamage + (player.str || 0) * 1;
 
-  // VIT raises max HP: +6 HP per VIT point (changed from 3 -> 6)
+  // ===== ADD EQUIPMENT BONUSES =====
+  let equipmentBonus = { str: 0, vit: 0, dex: 0, int: 0, luk: 0, damage: 0 };
+  
+  for (const slot of ["weapon", "armor", "accessory"]) {
+    const item = player.equipment[slot];
+    if (item && item.stats) {
+      for (const [stat, value] of Object.entries(item.stats)) {
+        if (equipmentBonus[stat] !== undefined) {
+          equipmentBonus[stat] += value;
+        }
+      }
+    }
+  }
+
+  // Apply equipment bonuses to damage
+  player.damage += equipmentBonus.damage;
+
+  // VIT raises max HP: +6 HP per VIT point
   const oldMax = player.maxHP;
+<<<<<<< HEAD
   player.maxHP = CONFIG.playerMaxHP + (player.vit || 0) * 6;
+=======
+  const baseHP = player.baseHPFromClass ?? CONFIG.playerMaxHP;
+  const totalVit = (player.vit || 0) + (equipmentBonus.vit || 0);
+  player.maxHP = baseHP + totalVit * 6;
+>>>>>>> 7d071832341609bee800187d758d7c3e9c3e55b1
 
   // When max HP increases, heal proportionally up to the new max (do not reduce HP)
   if (player.maxHP > oldMax) {
@@ -281,6 +382,18 @@ function applyLevelStats() {
   } else {
     player.hp = Math.min(player.hp, player.maxHP);
   }
+
+  // ===== CRIT CHANCE (base from stats + bonus from gear/scrolls) =====
+  const totalDex = (player.dex || 0) + (equipmentBonus.dex || 0);
+  const totalLuk = (player.luk || 0) + (equipmentBonus.luk || 0);
+  
+  const baseCrit =
+    0.03 + totalLuk * 0.003 + totalDex * 0.001;
+
+  const bonusCrit = player.bonusCritChance || 0;
+
+  player.critChance = clamp(baseCrit + bonusCrit, 0, 0.6); // max 60%
+  player.critMult = 1.5; // crit = x1.5 for now
 }
 
 
@@ -313,6 +426,27 @@ function addVIT() {
   if (player.statPoints <= 0) return;
   player.statPoints -= 1;
   player.vit += 1;
+  applyLevelStats();
+}
+
+function addDEX() {
+  if (player.statPoints <= 0) return;
+  player.statPoints -= 1;
+  player.dex += 1;
+  applyLevelStats();
+}
+
+function addINT() {
+  if (player.statPoints <= 0) return;
+  player.statPoints -= 1;
+  player.int += 1;
+  applyLevelStats();
+}
+
+function addLUK() {
+  if (player.statPoints <= 0) return;
+  player.statPoints -= 1;
+  player.luk += 1;
   applyLevelStats();
 }
 function updateDamageTexts(dt) {
@@ -383,6 +517,104 @@ function setInvOpen(v) {
   if (invOpen) updateInvPanelText();
 }
 
+// ===== WARDROBE UI =====
+let wardrobeOpen = false;
+
+function setWardrobeOpen(v) {
+  wardrobeOpen = v;
+  if (UI.wardrobePanel) {
+    UI.wardrobePanel.style.display = wardrobeOpen ? "block" : "none";
+  }
+  
+  if (wardrobeOpen) updateWardrobeDisplay();
+}
+
+// ===== DRAGGABLE PANELS =====
+let draggedPanel = null;
+let dragOffset = { x: 0, y: 0 };
+
+function makePanelDraggable(panel) {
+  const header = panel.querySelector('h3') || panel.querySelector('h2');
+  if (!header) return;
+
+  header.addEventListener('mousedown', (e) => {
+    draggedPanel = panel;
+    const rect = panel.getBoundingClientRect();
+    dragOffset.x = e.clientX - rect.left;
+    dragOffset.y = e.clientY - rect.top;
+    panel.style.cursor = 'grabbing';
+    header.style.cursor = 'grabbing';
+  });
+}
+
+document.addEventListener('mousemove', (e) => {
+  if (!draggedPanel) return;
+  draggedPanel.style.position = 'fixed';
+  draggedPanel.style.left = (e.clientX - dragOffset.x) + 'px';
+  draggedPanel.style.top = (e.clientY - dragOffset.y) + 'px';
+  draggedPanel.style.transform = 'none';  // Remove transform when dragging
+});
+
+document.addEventListener('mouseup', () => {
+  if (draggedPanel) {
+    draggedPanel.style.cursor = 'grab';
+    const header = draggedPanel.querySelector('h3') || draggedPanel.querySelector('h2');
+    if (header) header.style.cursor = 'grab';
+    draggedPanel = null;
+  }
+});
+
+function updateWardrobeDisplay() {
+  if (!UI.wardrobeContent) return;
+  
+  let html = "";
+  
+  const slots = [
+    { key: "weapon", icon: "⚔️", name: "Weapon" },
+    { key: "hat", icon: "🎩", name: "Hat" },
+    { key: "glasses", icon: "👓", name: "Glasses" },
+    { key: "earring", icon: "💎", name: "Earring" },
+    { key: "necklace", icon: "📿", name: "Necklace" },
+    { key: "top", icon: "👕", name: "Top" },
+    { key: "gloves", icon: "🧤", name: "Gloves" },
+    { key: "pants", icon: "👖", name: "Pants" },
+    { key: "shoes", icon: "👞", name: "Shoes" },
+    { key: "ring", icon: "💍", name: "Ring" }
+  ];
+  
+  for (const slot of slots) {
+    const item = player.equipment[slot.key];
+    
+    if (item) {
+      const color = item.color || "#FFF";
+      html += `<div class="wardrobe-item" style="background: rgba(255,215,0,0.1); border: 2px solid ${color}; padding: 8px; border-radius: 6px; margin-bottom: 6px;">`;
+      html += `<div style="font-weight: bold; color: ${color}; margin-bottom: 4px;">${slot.icon} ${item.name}</div>`;
+      html += `<small style="opacity: 0.7;">`;
+      
+      if (item.stats) {
+        for (const [stat, value] of Object.entries(item.stats)) {
+          html += `${stat.toUpperCase()}: +${value}<br>`;
+        }
+      }
+      
+      html += `</small>`;
+      html += `<button onclick="unequipItem('${slot.key}')" style="margin-top: 4px; padding: 2px 4px; font-size: 10px; background: #8B0000; color: white; border: none; border-radius: 3px; cursor: pointer;">Remove</button>`;
+      html += `</div>`;
+    } else {
+      html += `<div class="wardrobe-empty" style="background: rgba(100,100,100,0.2); border: 2px dashed #666; padding: 8px; border-radius: 6px; text-align: center; color: #999; opacity: 0.6; margin-bottom: 6px;">`;
+      html += `${slot.icon}<br><small>${slot.name}</small>`;
+      html += `</div>`;
+    }
+  }
+  
+  UI.wardrobeContent.innerHTML = html;
+  setupWardrobeDrag();
+}
+
+
+function setupWardrobeDrag() {
+  // נוסיף בעתיד - כרגע פשוט display
+}
 
 function updateInvPanelText() {
   if (!UI.invInfo) return;
@@ -393,6 +625,55 @@ function updateInvPanelText() {
   if (!container) return;
 
   let html = "";
+
+  // ===== EQUIPPED GEAR =====
+  html += `<div style="margin-top: 12px; border-top: 1px solid #FFD700; padding-top: 8px; border-bottom: 1px solid #FFD700; padding-bottom: 8px; margin-bottom: 8px;">`;
+  html += `<small style="opacity: 0.7; font-weight: bold; color: #FFD700;">⚔️ EQUIPPED GEAR</small><br>`;
+  
+  let hasEquipped = false;
+  for (const slot of ["weapon", "armor", "accessory"]) {
+    const item = player.equipment[slot];
+    if (item) {
+      hasEquipped = true;
+      const color = item.color || "#FFF";
+      html += `<div style="display: flex; align-items: center; margin: 4px 0; padding: 4px; background: rgba(255, 215, 0, 0.1); border-left: 3px solid ${color};">`;
+      html += `  <span style="color: ${color}; font-weight: bold; flex: 1;">${item.name}</span>`;
+      html += `  <button onclick="unequipItem('${slot}')" style="padding: 2px 6px; font-size: 11px; background: #8B0000; color: white;">Remove</button>`;
+      html += `</div>`;
+    }
+  }
+  
+  if (!hasEquipped) {
+    html += `<small style="opacity: 0.5;">No gear equipped</small>`;
+  }
+  
+  html += `</div>`;
+
+  // ===== EQUIPMENT ITEMS =====
+  if (player.inventory && player.inventory.length > 0) {
+    html += `<div style="margin-top: 8px; border-top: 1px solid #555; padding-top: 8px;">`;
+    html += `<small style="opacity: 0.7; font-weight: bold;">📦 INVENTORY</small><br>`;
+    
+    for (const item of player.inventory) {
+      if (!item.itemData) continue;
+      const itemName = item.itemData.name;
+      const itemType = item.itemData.type;
+      const color = item.itemData.color || "#FFF";
+      
+      html += `<div class="inv-item-row" style="display: flex; align-items: center; margin: 4px 0; padding: 4px; border-left: 3px solid ${color};">`;
+      html += `  <span style="color: ${color}; font-weight: bold; flex: 1;">${itemName}</span>`;
+      html += `  <small style="opacity: 0.7; margin-right: 4px;">[${itemType}]</small>`;
+      html += `  <button onclick="equipItem(${item.itemData.id})" style="padding: 2px 6px; font-size: 11px;">Equip</button>`;
+      html += `</div>`;
+    }
+    
+    html += `</div>`;
+  }
+
+  // ===== POTIONS =====
+  html += `<div style="margin-top: 12px; border-top: 1px solid #555; padding-top: 8px;">`;
+  html += `<small style="opacity: 0.7; font-weight: bold;">POTIONS</small><br>`;
+  
   for (const p of POTIONS) {
     const qty = inv[p.id] ?? 0;
     const typeClass = p.type === "mp" ? "mp" : "";
@@ -403,9 +684,66 @@ function updateInvPanelText() {
     html += `  <button class="inv-use-btn ${typeClass}" onclick="usePotion('${p.id}')" ${qty <= 0 ? 'disabled' : ''}>Use</button>`;
     html += `</div>`;
   }
+  
+  html += `</div>`;
+  
   container.innerHTML = html;
 }
 
+// ===== EQUIP ITEM FUNCTION =====
+window.equipItem = function(itemId) {
+  const item = itemsDb?.items?.find(x => x.id === itemId);
+  if (!item) return;
+
+  const slot = item.slot;
+
+  // Remove from inventory
+  player.inventory = player.inventory.filter(x => x.itemData?.id !== itemId);
+
+  // Unequip old item of same slot
+  if (player.equipment[slot]) {
+    const oldItem = player.equipment[slot];
+    player.inventory.push({
+      itemId: oldItem.id,
+      itemData: oldItem,
+      quantity: 1,
+    });
+  }
+
+  // Equip new item
+  player.equipment[slot] = item;
+
+  addError(`לבשת: ${item.name}`);
+  applyLevelStats(); // Recalculate stats with new equipment
+  updateInvPanelText();
+  updateStatsPanelText();
+};
+
+// ===== UNEQUIP ITEM FUNCTION =====
+window.unequipItem = function(slot) {
+  console.log("Unequip called for slot:", slot);
+  const item = player.equipment[slot];
+  if (!item) {
+    console.log("No item in slot:", slot);
+    return;
+  }
+
+  // Move to inventory
+  player.inventory.push({
+    itemId: item.id,
+    itemData: item,
+    quantity: 1,
+  });
+
+  // Unequip
+  player.equipment[slot] = null;
+  console.log("Unequipped:", slot, item.name);
+
+  addError(`הורדת: ${item.name}`);
+  applyLevelStats(); // Recalculate stats
+  updateInvPanelText();
+  updateStatsPanelText();
+};
 
 function toggleInv() {
   setInvOpen(!invOpen);
@@ -424,13 +762,23 @@ function toggleStats() {
 function updateStatsPanelText() {
   if (!UI.statsInfo) return;
 
+  const critPercent = ((player.critChance ?? 0) * 100).toFixed(1);
+
+  let equippedText = "";
+  if (player.equipment.weapon) equippedText += `⚔️ ${player.equipment.weapon.name}\n`;
+  if (player.equipment.armor) equippedText += `🛡️ ${player.equipment.armor.name}\n`;
+  if (player.equipment.accessory) equippedText += `💍 ${player.equipment.accessory.name}`;
+
   UI.statsInfo.innerHTML =
     `LV: <b>${player.level}</b><br>` +
     `HP: <b>${player.hp}/${player.maxHP}</b><br>` +
     `DMG: <b>${player.damage}</b><br>` +
+    `CRIT: <b>${critPercent}%</b><br>` +
     `EXP: <b>${Math.floor(player.exp)}/${player.expToNext}</b><br>` +
     `SP: <b>${player.statPoints}</b><br>` +
-    `STR: <b>${player.str}</b> | VIT: <b>${player.vit}</b>`;
+    `STR: <b>${player.str}</b> | VIT: <b>${player.vit}</b><br>` +
+    `DEX: <b>${player.dex}</b> | INT: <b>${player.int}</b> | LUK: <b>${player.luk}</b>` +
+    (equippedText ? `<br><br><small style="opacity: 0.8;">EQUIPPED:<br>${equippedText}</small>` : "");
 }
 
 
@@ -498,14 +846,46 @@ function loadImage(src) {
   });
 }
 // ===== DAMAGE DIGITS (Maple-style) =====
+<<<<<<< HEAD
 const dmgDigits = {};
+=======
+const dmgDigits = (window.dmgDigits = {});
+const dmgCritDigits = (window.dmgCritDigits = {});
+
+const dmgSpecial = {
+  miss: null,
+  block: null,
+};
+>>>>>>> 7d071832341609bee800187d758d7c3e9c3e55b1
 
 function loadDmgDigits() {
+  const tasks = [];
+
+  // normal digits
   for (let i = 0; i <= 9; i++) {
     const img = new Image();
     img.src = `./assets/ui/dmg/${i}.png`;
     dmgDigits[i] = img;
+    tasks.push(new Promise(res => { img.onload = res; img.onerror = res; }));
   }
+<<<<<<< HEAD
+=======
+
+  // crit digits
+  for (let i = 0; i <= 9; i++) {
+    const img = new Image();
+    img.src = `./assets/ui/dmg_crit/${i}.png`;
+    dmgCritDigits[i] = img;
+    tasks.push(new Promise(res => { img.onload = res; img.onerror = res; }));
+  }
+
+  // MISS
+  dmgSpecial.miss = new Image();
+  dmgSpecial.miss.src = `./assets/ui/dmg/Miss.png`;
+  tasks.push(new Promise(res => { dmgSpecial.miss.onload = res; dmgSpecial.miss.onerror = res; }));
+
+  return Promise.all(tasks);
+>>>>>>> 7d071832341609bee800187d758d7c3e9c3e55b1
 }
 
 
@@ -570,6 +950,42 @@ function spawnMeso(x, y, minValue = 10, maxValue = 600) {
   });
 }
 
+// ===== ITEM DROP SYSTEM =====
+function tryDropItem(x, y, isBoss = false) {
+  // סיכוי דרופ: 30% לבוס, 15% לרגיל
+  const dropChance = isBoss ? 0.3 : 0.15;
+  if (Math.random() > dropChance) return;
+
+  // בחר רמת rarity
+  const rand = Math.random();
+  let rarity = "common";
+  if (rand < (itemsDb?.dropRates?.epic || 0.03)) rarity = "epic";
+  else if (rand < (itemsDb?.dropRates?.rare || 0.12)) rarity = "rare";
+  else if (rand < (itemsDb?.dropRates?.uncommon || 0.25)) rarity = "uncommon";
+
+  // בחר item מן rarity זה
+  const itemList = itemsByRarity[rarity] || [];
+  if (itemList.length === 0) return;
+
+  const item = itemList[Math.floor(Math.random() * itemList.length)];
+
+  // צור drop object (דומה למeso)
+  mesos.push({
+    x,
+    y,
+    w: 20,
+    h: 20,
+    vx: randBetween(-80, 80),
+    vy: randBetween(-300, -150),
+    value: 0,  // לא קשור
+    type: "item",
+    itemId: item.id,
+    itemData: item,
+    itemRarity: rarity,
+    life: 20,
+  });
+}
+
 function updateMesos(dt) {
   const pb = playerBox();
 
@@ -618,7 +1034,20 @@ function updateMesos(dt) {
 
     // pickup (using player hitbox)
     if (intersects(pb, c)) {
-      playerMesos += c.value;
+      // Check if it's an item or meso
+      if (c.type === "item" && c.itemData) {
+        // Add to inventory
+        player.inventory.push({
+          itemId: c.itemId,
+          itemData: c.itemData,
+          quantity: 1,
+        });
+        addError(`לקחת ${c.itemData.name}!`);
+      } else {
+        // Regular meso
+        playerMesos += c.value;
+      }
+      
       mesos.splice(i, 1);
 
       // ✅ update inventory text when picking up
@@ -632,6 +1061,31 @@ function drawMesos() {
   const t = nowMs();
 
   for (const c of mesos) {
+    // Handle items
+    if (c.type === "item" && c.itemData) {
+      // Draw colored rect for item
+      const color = c.itemData.color || "#FFD700";
+      ctx.fillStyle = color;
+      ctx.globalAlpha = Math.max(c.life / 3, 0.6);
+      ctx.fillRect(
+        c.x * scaleX,
+        c.y * scaleY,
+        c.w * scaleX,
+        c.h * scaleY
+      );
+      ctx.strokeStyle = "#FFF";
+      ctx.lineWidth = 1;
+      ctx.strokeRect(
+        c.x * scaleX,
+        c.y * scaleY,
+        c.w * scaleX,
+        c.h * scaleY
+      );
+      ctx.globalAlpha = 1;
+      continue;
+    }
+
+    // Handle mesos (regular)
     const frames = mesoFrames[c.type];
     if (!frames || frames.length === 0) continue;
 
@@ -775,6 +1229,8 @@ let questIndex = new Map();
 let questState = null;
 let mapsDb = {};
 let currentMapName = "";
+let itemsDb = null;
+let itemsByRarity = { common: [], uncommon: [], rare: [], epic: [] };
 
 
 
@@ -787,6 +1243,30 @@ const player = {
   h: 70,
   facing: 1,
 
+<<<<<<< HEAD
+=======
+  class: "warrior",
+  classLocked: false,
+
+  // סטטים נוספים להמשך (לא שובר כלום)
+  dex: 0,
+  int: 0,
+  luk: 0,
+
+  // ===== CRIT SYSTEM (base + bonus) =====
+  critChance: 0,        // ייחושב ב-applyLevelStats
+  critMult: 1.5,        // קריט = x1.5
+  bonusCritChance: 0,   // תוספות מציוד/מגילות בעתיד
+
+  // בסיסים שמגיעים מהקלאס
+  baseHPFromClass: CONFIG.playerMaxHP,
+  baseMPFromClass: 0,
+
+  // MP בסיסי
+  maxMP: 0,
+  mp: 0,
+
+>>>>>>> 7d071832341609bee800187d758d7c3e9c3e55b1
   anim: "stand",
   animUntil: 0,
 
@@ -796,7 +1276,6 @@ const player = {
   vy: 0,
   onGround: false,
   onPlatform: null, // null = קרקע, או אובייקט פלטפורמה
-
 
   speed: CONFIG.playerSpeed,
   damage: CONFIG.playerDamage,
@@ -809,14 +1288,27 @@ const player = {
   str: 0,
   vit: 0,
 
-
   lastAttackAt: 0,
 
   maxHP: CONFIG.playerMaxHP,
   hp: CONFIG.playerMaxHP,
   lastHurtAt: -999999,
-};
 
+  // ===== EQUIPMENT & INVENTORY =====
+  equipment: {
+    weapon: null,
+    top: null,
+    pants: null,
+    shoes: null,
+    gloves: null,
+    hat: null,
+    glasses: null,
+    earring: null,
+    necklace: null,
+    ring: null,
+  },
+  inventory: [],       // array of { itemId, itemData, quantity }
+};
 // ═══════════════════════════════════════════════════════
 // ===== AUTH & SAVE/LOAD SYSTEM =====
 // ═══════════════════════════════════════════════════════
@@ -866,6 +1358,13 @@ function collectGameData() {
     mesos: playerMesos,
 
     inventory: { ...inv },
+    
+    // ===== EQUIPMENT & ITEMS =====
+    equipment: { ...player.equipment },
+    itemInventory: player.inventory.map(item => ({
+      itemId: item.itemId,
+      quantity: item.quantity,
+    })),
 
     currentQuestId: questState?.activeQuestId || null,
     completedQuests: questState ? Array.from(questState.completed) : [],
@@ -878,27 +1377,27 @@ function collectGameData() {
 async function applyGameData(gd) {
   if (!gd) return;
 
-  player.level       = gd.level       ?? player.level;
-  player.exp         = gd.exp         ?? player.exp;
-  player.expToNext   = gd.expToNext   ?? player.expToNext;
+  player.level = gd.level ?? player.level;
+  player.exp = gd.exp ?? player.exp;
+  player.expToNext = gd.expToNext ?? player.expToNext;
 
   if (gd.playerClass) {
     applyClassBase(player, gd.playerClass);
   }
   player.classLocked = gd.classLocked ?? player.classLocked;
 
-  player.str        = gd.str        ?? player.str;
-  player.vit        = gd.vit        ?? player.vit;
-  player.dex        = gd.dex        ?? player.dex;
-  player.int        = gd.int        ?? player.int;
-  player.luk        = gd.luk        ?? player.luk;
+  player.str = gd.str ?? player.str;
+  player.vit = gd.vit ?? player.vit;
+  player.dex = gd.dex ?? player.dex;
+  player.int = gd.int ?? player.int;
+  player.luk = gd.luk ?? player.luk;
   player.statPoints = gd.statPoints ?? player.statPoints;
 
   applyLevelStats();
 
-  player.hp    = gd.hp    ?? player.hp;
+  player.hp = gd.hp ?? player.hp;
   player.maxHP = gd.maxHP ?? player.maxHP;
-  player.mp    = gd.mp    ?? player.mp;
+  player.mp = gd.mp ?? player.mp;
   player.maxMP = gd.maxMP ?? player.maxMP;
   player.damage = gd.damage ?? player.damage;
 
@@ -917,6 +1416,33 @@ async function applyGameData(gd) {
   if (gd.inventory) {
     for (const k of Object.keys(inv)) {
       inv[k] = gd.inventory[k] ?? inv[k];
+    }
+  }
+
+  // ===== LOAD EQUIPMENT & ITEMS =====
+  if (gd.equipment && itemsDb?.items) {
+    for (const slot of ["weapon", "armor", "accessory"]) {
+      if (gd.equipment[slot]) {
+        const itemId = gd.equipment[slot].id;
+        const item = itemsDb.items.find(x => x.id === itemId);
+        if (item) {
+          player.equipment[slot] = item;
+        }
+      }
+    }
+  }
+
+  if (gd.itemInventory && itemsDb?.items) {
+    player.inventory = [];
+    for (const saved of gd.itemInventory) {
+      const item = itemsDb.items.find(x => x.id === saved.itemId);
+      if (item) {
+        player.inventory.push({
+          itemId: item.id,
+          itemData: item,
+          quantity: saved.quantity || 1,
+        });
+      }
     }
   }
 
@@ -1178,11 +1704,38 @@ function tryAttack() {
   for (const m of mobs) {
     if (m.dead) continue;
     if (!intersects(atk, m)) continue;
+<<<<<<< HEAD
+=======
+
+    // ✅ MISS roll
+    if (Math.random() < 0.05) {
+      damageTexts.push({
+        x: m.x + m.w / 2,
+        y: m.y,
+        kind: "miss",
+        value: 0,
+        life: 0.7,
+      });
+      continue;
+    }
+>>>>>>> 7d071832341609bee800187d758d7c3e9c3e55b1
+
+    // ✅ CRIT roll
+    const isCrit = Math.random() < (player.critChance ?? 0);
+    let dealt = player.damage;
+    if (isCrit) dealt = Math.floor(dealt * (player.critMult ?? 1.5));
 
     // לחשב דמג' אמיתי (לא יותר מהחיים שנותרו)
-    const realDamage = Math.min(player.damage, m.hp);
+    const realDamage = Math.min(dealt, m.hp);
 
     m.hp -= realDamage;
+<<<<<<< HEAD
+=======
+
+    // ✅ Activate hit flash
+    m.flashUntil = nowMs() + 90;
+    m.flashKind = "hit";
+>>>>>>> 7d071832341609bee800187d758d7c3e9c3e55b1
 
     // AGGRO: המוב ננעל על השחקן ל-2.5 שניות
     m.aggroUntil = nowMs() + 2500;
@@ -1201,9 +1754,15 @@ function tryAttack() {
     // ליצור טקסט דמג'
     damageTexts.push({
       x: m.x + m.w / 2,
+<<<<<<< HEAD
       y: m.y,
+=======
+      y: m.y - 40,  // Start higher above mob
+      kind: isCrit ? "crit" : "hit",
+>>>>>>> 7d071832341609bee800187d758d7c3e9c3e55b1
       value: realDamage,
-      life: 0.6,
+      life: 0.8,  // Last longer
+      isCrit: isCrit
     });
 
     if (m.hp <= 0) {
@@ -1217,12 +1776,13 @@ function tryAttack() {
       const dropY = m.y + m.h / 2;
 
       if (isBoss) {
-        // שק לבוס (יעבור ל-mesos4 לפי הטווח)
         spawnMeso(dropX, dropY, 800, 2000);
       } else {
-        // מוב רגיל
         spawnMeso(dropX, dropY, 10, 600);
       }
+
+      // ===== DROP ITEMS =====
+      tryDropItem(dropX, dropY, isBoss);
 
       gainExp(m.exp);
       onMobKilled(m.id);
@@ -1584,44 +2144,32 @@ function spawnLogic() {
 
   const aliveCount = mobs.filter(m => !m.dead && m.state !== "die").length;
 
-
-  // For qBoss quests, only allow 1 mob and spawn at ground platform
+  // ✅ Boss quest: only 1 mob on ground
   if (questState.activeQuestId && questState.activeQuestId.startsWith("qBoss")) {
     if (aliveCount >= 1) return;
 
     const id = targets[0];
-    const groundPlatform = WORLD.platforms[0]; // ground platform
+    const groundPlatform = WORLD.platforms[0];
     const x = groundPlatform.x + 100 + Math.random() * (groundPlatform.w - 200);
     mobs.push(spawnMob(id, x, groundPlatform));
-  } else
+    return;
+  }
 
-    // For qBoss quests, only allow 1 mob and spawn at ground platform
-    if (questState.activeQuestId && questState.activeQuestId.startsWith("qBoss")) {
-      if (aliveCount >= 1) return;
+  // ✅ Normal quests
+  if (aliveCount >= CONFIG.spawnMaxOnScreen) return;
 
-      const id = targets[0];
-      const groundPlatform = WORLD.platforms[0]; // ground platform
-      const x = groundPlatform.x + 100 + Math.random() * (groundPlatform.w - 200);
-      mobs.push(spawnMob(id, x, groundPlatform));
-    } else {
-      if (aliveCount >= CONFIG.spawnMaxOnScreen) return;
+  const id = targets[0];
+  const plats = WORLD.platforms.slice(1);
+  const p = pickPlatformWeighted(plats);
 
-      const id = targets[0];
-      const plats = WORLD.platforms.slice(1);
+  // קצרה? רק אם אין עליה אף אחד
+  if (isShortPlatform(p) && countAliveOnPlatform(p) >= 1) return;
 
-      const p = pickPlatformWeighted(plats);
+  // ארוכה? תן שיהיו עליה הרבה
+  if (!isShortPlatform(p) && countAliveOnPlatform(p) >= 6) return;
 
-      // קצרה? רק אם אין עליה אף אחד
-      if (isShortPlatform(p) && countAliveOnPlatform(p) >= 1) return;
-
-      // ארוכה? תן שיהיו עליה הרבה
-      if (!isShortPlatform(p) && countAliveOnPlatform(p) >= 6) return;
-
-      const x = p.x + 20 + Math.random() * (p.w - 60);
-      mobs.push(spawnMob(id, x, p));
-
-    }
-
+  const x = p.x + 20 + Math.random() * (p.w - 60);
+  mobs.push(spawnMob(id, x, p));
 }
 
 function isShortPlatform(p) {
@@ -1823,19 +2371,25 @@ function render() {
 
     const valueStr = String(Math.floor(d.value));
 
-    const digitW = 18 * scaleX;
-    const digitH = 24 * scaleY;
+    // Bigger for crit
+    const baseSizeX = d.isCrit ? 24 : 18;
+    const baseSizeY = d.isCrit ? 32 : 24;
+    const digitW = baseSizeX * scaleX;
+    const digitH = baseSizeY * scaleY;
 
     const totalW = valueStr.length * digitW;
     let drawX = d.x * scaleX - totalW / 2;
     const drawYY = d.y * scaleY;
 
+    const digitsPack = (d.kind === "crit") ? dmgCritDigits : dmgDigits;
+
     for (const ch of valueStr) {
-      const img = dmgDigits[ch];
-      if (img && img.complete && img.naturalWidth > 0) ctx.drawImage(img, drawX, drawYY, digitW, digitH);
+      const img = digitsPack[ch];
+      if (img && img.complete && img.naturalWidth > 0) {
+        ctx.drawImage(img, drawX, drawYY, digitW, digitH);
+      }
       drawX += digitW;
     }
-
     ctx.globalAlpha = 1;
   }
   ctx.textAlign = "start";
@@ -2109,7 +2663,6 @@ canvas.addEventListener("mousedown", (e) => {
   }
 });
 
-
 async function boot() {
   const statsList = await fetchJsonFirstOk([
     PATHS.statsPrimary,
@@ -2120,11 +2673,36 @@ async function boot() {
 
   questsDb = await fetchJson(PATHS.quests);
 
+  // ===== LOAD ITEMS DATABASE =====
+  itemsDb = await fetchJson(PATHS.items);
+  console.log("Loaded itemsDb:", itemsDb);
+  
+  // Organize items by rarity
+  if (itemsDb && itemsDb.items) {
+    for (const item of itemsDb.items) {
+      const rar = item.rarity || "common";
+      if (!itemsByRarity[rar]) itemsByRarity[rar] = [];
+      itemsByRarity[rar].push(item);
+    }
+    console.log("Items by rarity:", itemsByRarity);
+  }
+
   // Load maps from quests.json
   mapsDb = questsDb.maps || {};
 
   initQuestState();
   player.expToNext = expNeededForLevel(player.level);
+<<<<<<< HEAD
+=======
+
+  // ✅ אל תנעול קלאס פה. נותנים ברירת מחדל רק כדי שהמשחק לא ישבר לפני בחירה
+  // applyClassBase(player, "warrior"); // ❌ לא
+  if (!player.class || !CLASS_DB[player.class]) {
+    player.class = "warrior";
+  }
+  applyClassBase(player, player.class);
+  player.classLocked = false; // ✅ חשוב
+>>>>>>> 7d071832341609bee800187d758d7c3e9c3e55b1
   applyLevelStats();
 
   // Load the map for the initial quest
@@ -2191,7 +2769,10 @@ async function boot() {
     UI.menuDropdown?.classList.remove("open");
     const show = UI.statsPanel.style.display !== "block";
     UI.statsPanel.style.display = show ? "block" : "none";
-    if (show) UI.invPanel.style.display = "none";
+    if (show) {
+      UI.invPanel.style.display = "none";
+      UI.wardrobePanel.style.display = "none";
+    }
   });
 
   // ✅ INVENTORY BUTTON EVENT
@@ -2201,12 +2782,29 @@ async function boot() {
     UI.invPanel.style.display = show ? "block" : "none";
     if (show) {
       UI.statsPanel.style.display = "none";
+      UI.wardrobePanel.style.display = "none";
       updateInvPanelText();
+      makePanelDraggable(UI.invPanel);
     }
   });
 
 <<<<<<< HEAD
+<<<<<<< HEAD
   // ✅ Claim quest reward by clicking the quest progress text
+=======
+  // ✅ WARDROBE BUTTON EVENT
+  UI.wardrobeBtn?.addEventListener("click", () => {
+    UI.menuDropdown?.classList.remove("open");
+    const show = UI.wardrobePanel.style.display !== "block";
+    UI.wardrobePanel.style.display = show ? "block" : "none";
+    if (show) {
+      UI.statsPanel.style.display = "none";
+      UI.invPanel.style.display = "none";
+      makePanelDraggable(UI.wardrobePanel);
+      updateWardrobeDisplay();
+    }
+  });
+>>>>>>> 7d071832341609bee800187d758d7c3e9c3e55b1
 
   let claimingQuest = false;
 
@@ -2242,24 +2840,87 @@ async function boot() {
     updateStatsPanelText();
   });
 
+  UI.btnAddDEX?.addEventListener("click", () => {
+    addDEX();
+    updateStatsPanelText();
+  });
+
+  UI.btnAddINT?.addEventListener("click", () => {
+    addINT();
+    updateStatsPanelText();
+  });
+
+  UI.btnAddLUK?.addEventListener("click", () => {
+    addLUK();
+    updateStatsPanelText();
+  });
+
   // עדכון ראשוני
   updateStatsPanelText();
-  loadDmgDigits();
+  await loadDmgDigits();
   loadMesoFrames();
 
+  // =====================================================
+  // ✅ CLASS SELECT HANDLER (MUST BE GLOBAL FOR onclick="")
+  // =====================================================
+  window.chooseClassUI = async function (classKey) {
+    try {
+      applyClassBase(player, classKey);
+      applyLevelStats();
+      player.classLocked = true;
 
 <<<<<<< HEAD
+<<<<<<< HEAD
   // ===== LOGIN SYSTEM (MongoDB) =====
+=======
+      updateStatsPanelText();
+      updateInvPanelText();
+
+      // hide class screen
+      const classScreen = document.getElementById("classScreen");
+      if (classScreen) classScreen.style.display = "none";
+
+      // start playing
+      startPlaying();
+
+      // אופציונלי: אם זה שחקן חדש בלי שמירה, תעשה save ראשון
+      await saveGameToServer();
+    } catch (err) {
+      const msg = document.getElementById("classMsg");
+      if (msg) msg.textContent = "Failed to choose class: " + err.message;
+      addError("Choose class error: " + err.message);
+    }
+  };
+
+  // =====================================================
+  // ✅ LOGIN SYSTEM (MongoDB)
+  // =====================================================
+>>>>>>> 7d071832341609bee800187d758d7c3e9c3e55b1
   function showGameUI() {
     isLoggedIn = true;
+
+    // hide login
     if (UI.loginScreen) UI.loginScreen.style.display = "none";
-    if (UI.hud) UI.hud.style.display = "block";
-    if (UI.gameMenu) UI.gameMenu.style.display = "block";
+
+    // show class select first (אלא אם כבר יש קלאס שמור)
+    const classScreen = document.getElementById("classScreen");
+    if (classScreen) classScreen.style.display = "flex";
+
+    // keep gameplay UI hidden until class is chosen
+    if (UI.hud) UI.hud.style.display = "none";
+    if (UI.gameMenu) UI.gameMenu.style.display = "none";
+    if (UI.statsPanel) UI.statsPanel.style.display = "none";
+    if (UI.invPanel) UI.invPanel.style.display = "none";
+
     if (UI.loginMsg) UI.loginMsg.textContent = "";
   }
 
   function hideGameUI() {
     isLoggedIn = false;
+
+    const classScreen = document.getElementById("classScreen");
+    if (classScreen) classScreen.style.display = "none";
+
     if (UI.loginScreen) UI.loginScreen.style.display = "flex";
     if (UI.hud) UI.hud.style.display = "none";
     if (UI.gameMenu) UI.gameMenu.style.display = "none";
@@ -2273,7 +2934,7 @@ async function boot() {
     localStorage.setItem("maple_token", token);
     localStorage.setItem("maple_user", username);
 
-    showGameUI();
+    showGameUI(); // מציג מסך בחירת קלאס כברירת מחדל
 
     // Load saved game data from server
     const gd = await loadGameFromServer();
@@ -2282,6 +2943,15 @@ async function boot() {
       addError(`Welcome back, ${username}! Game data loaded.`);
     } else {
       addError(`Welcome, ${username}! Starting fresh.`);
+      // ✅ שחקן חדש: להשאיר classLocked = false כדי שיבחר קלאס
+      player.classLocked = false;
+    }
+
+    // ✅ אם כבר יש קלאס שמור (classLocked) — לדלג על בחירה ולהתחיל לשחק
+    if (player.classLocked) {
+      const classScreen = document.getElementById("classScreen");
+      if (classScreen) classScreen.style.display = "none";
+      startPlaying();
     }
 
     startAutoSave();
@@ -2333,9 +3003,9 @@ async function boot() {
 
   // ── Register button ──
   UI.registerBtn?.addEventListener("click", async () => {
-    const user  = UI.loginUser?.value.trim();
+    const user = UI.loginUser?.value.trim();
     const email = UI.loginEmail?.value.trim();
-    const pass  = UI.loginPass?.value.trim();
+    const pass = UI.loginPass?.value.trim();
 
     if (!user || !email || !pass) {
       if (UI.loginMsg) UI.loginMsg.textContent = "All fields are required.";
@@ -2377,7 +3047,7 @@ async function boot() {
 
   // ── Auto-login with existing token ──
   const savedToken = localStorage.getItem("maple_token");
-  const savedUser  = localStorage.getItem("maple_user");
+  const savedUser = localStorage.getItem("maple_user");
 
   if (savedToken && savedUser) {
     authToken = savedToken;
