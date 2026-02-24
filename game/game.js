@@ -39,7 +39,6 @@ const UI = {
   invBtn: document.getElementById("invBtn"),
   invPanel: document.getElementById("invPanel"),
   invInfo: document.getElementById("invInfo"),
-<<<<<<< HEAD
 
   // ===== TOP-RIGHT MENU =====
   gameMenu: document.getElementById("gameMenu"),
@@ -62,8 +61,6 @@ const UI = {
   // ===== DEATH =====
   deathOverlay: document.getElementById("deathOverlay"),
   respawnBtn: document.getElementById("respawnBtn"),
-=======
->>>>>>> parent of 3edecf82 (I built a proper class system with a structured CLASS_DB, where each class actually affects HP, MP, stats, and real damage calculations — not just visuals. I upgraded the HUD to display working MP, added smooth stage transitions, and improved visuals by adding mob shadows for better depth.)
 };
 
 
@@ -265,37 +262,11 @@ function expNeededForLevel(lv) {
   return Math.floor(30 + (lv - 1) * 18 + (lv - 1) * (lv - 1) * 6);
 }
 
-<<<<<<< HEAD
-=======
-function getClassData(player) {
-  return CLASS_DB[player.class] || CLASS_DB.warrior;
+// Stub for applyClassBase — class system not yet active
+function applyClassBase(p, classKey) {
+  p.class = classKey || "warrior";
 }
 
-function applyClassBase(player, classKey) {
-  const c = CLASS_DB[classKey];
-  if (!c) throw new Error("Invalid class: " + classKey);
-
-  player.class = classKey;
-  player.classLocked = true;
-
-  // בסיס סטטים
-  player.str = c.baseStats.str;
-  player.vit = c.baseStats.vit;
-
-  // להכנה לעתיד (לא שובר כלום)
-  player.dex = c.baseStats.dex;
-  player.int = c.baseStats.int;
-  player.luk = c.baseStats.luk;
-
-  // בסיס HP/MP
-  player.baseHPFromClass = c.baseHP;
-  player.baseMPFromClass = c.baseMP;
-
-  // מערכת MP בסיסית
-  player.maxMP = c.baseMP;
-  player.mp = c.baseMP;
-}
->>>>>>> 7d071832341609bee800187d758d7c3e9c3e55b1
 
 function applyLevelStats() {
   // STR מעלה דמג'
@@ -304,17 +275,7 @@ function applyLevelStats() {
 
   // VIT raises max HP: +6 HP per VIT point (changed from 3 -> 6)
   const oldMax = player.maxHP;
-<<<<<<< HEAD
   player.maxHP = CONFIG.playerMaxHP + (player.vit || 0) * 6;
-=======
-  const baseHP = player.baseHPFromClass ?? CONFIG.playerMaxHP;
-<<<<<<< HEAD
-  const totalVit = (player.vit || 0) + (equipmentBonus.vit || 0);
-  player.maxHP = baseHP + totalVit * 6;
->>>>>>> 7d071832341609bee800187d758d7c3e9c3e55b1
-=======
-  player.maxHP = baseHP + (player.vit || 0) * 6;
->>>>>>> parent of 7d071832 (add)
 
   // When max HP increases, heal proportionally up to the new max (do not reduce HP)
   if (player.maxHP > oldMax) {
@@ -539,21 +500,7 @@ function loadImage(src) {
   });
 }
 // ===== DAMAGE DIGITS (Maple-style) =====
-<<<<<<< HEAD
-<<<<<<< HEAD
 const dmgDigits = {};
-=======
-const dmgDigits = (window.dmgDigits = {});
-const dmgCritDigits = (window.dmgCritDigits = {});
-
-=======
-const dmgDigits = {};
->>>>>>> parent of 7d071832 (add)
-const dmgSpecial = {
-  miss: null,
-  block: null, // אופציונלי אם תוסיף Block.png
-};
->>>>>>> 7d071832341609bee800187d758d7c3e9c3e55b1
 
 function loadDmgDigits() {
   for (let i = 0; i <= 9; i++) {
@@ -561,20 +508,6 @@ function loadDmgDigits() {
     img.src = `./assets/ui/dmg/${i}.png`;
     dmgDigits[i] = img;
   }
-<<<<<<< HEAD
-=======
-
-  // ✅ MISS sprite
-  dmgSpecial.miss = new Image();
-<<<<<<< HEAD
-  dmgSpecial.miss.src = `./assets/ui/dmg/Miss.png`;
-  tasks.push(new Promise(res => { dmgSpecial.miss.onload = res; dmgSpecial.miss.onerror = res; }));
-
-  return Promise.all(tasks);
->>>>>>> 7d071832341609bee800187d758d7c3e9c3e55b1
-=======
-  dmgSpecial.miss.src = `./assets/ui/dmg/Miss.png`; // חייב להיות בדיוק אותו שם
->>>>>>> parent of 7d071832 (add)
 }
 
 
@@ -856,25 +789,6 @@ const player = {
   h: 70,
   facing: 1,
 
-<<<<<<< HEAD
-=======
-  class: "warrior",
-  classLocked: false,
-
-  // סטטים נוספים להמשך (לא שובר כלום)
-  dex: 0,
-  int: 0,
-  luk: 0,
-
-  // בסיסים שמגיעים מהקלאס
-  baseHPFromClass: CONFIG.playerMaxHP,
-  baseMPFromClass: 0,
-
-  // MP בסיסי
-  maxMP: 0,
-  mp: 0,
-
->>>>>>> 7d071832341609bee800187d758d7c3e9c3e55b1
   anim: "stand",
   animUntil: 0,
 
@@ -1050,7 +964,9 @@ async function saveGameToServer() {
       headers: getAuthHeaders(),
       body: JSON.stringify({ gameData: collectGameData() }),
     });
-    const data = await resp.json();
+    const text = await resp.text();
+    let data;
+    try { data = JSON.parse(text); } catch { data = {}; }
     if (!resp.ok) {
       addError("Save failed: " + (data.error || "unknown"));
     } else {
@@ -1067,7 +983,9 @@ async function loadGameFromServer() {
     const resp = await fetch(`${API_BASE}/game/load`, {
       headers: getAuthHeaders(),
     });
-    const data = await resp.json();
+    const text = await resp.text();
+    let data;
+    try { data = JSON.parse(text); } catch { return null; }
     if (!resp.ok) return null;
     return data.gameData || null;
   } catch {
@@ -1266,39 +1184,11 @@ function tryAttack() {
   for (const m of mobs) {
     if (m.dead) continue;
     if (!intersects(atk, m)) continue;
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
-
-=======
->>>>>>> parent of 7d071832 (add)
-    // ✅ MISS roll
-    if (Math.random() < 0.05) {
-      damageTexts.push({
-        x: m.x + m.w / 2,
-        y: m.y,
-        kind: "miss",
-        value: 0,
-        life: 0.7,
-      });
-      continue; // לא מורידים HP, לא HIT, לא KNOCKBACK
-    }
->>>>>>> 7d071832341609bee800187d758d7c3e9c3e55b1
 
     // לחשב דמג' אמיתי (לא יותר מהחיים שנותרו)
     const realDamage = Math.min(player.damage, m.hp);
 
     m.hp -= realDamage;
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
-
-=======
->>>>>>> parent of 7d071832 (add)
-    // ✅ Activate hit flash
-    m.flashUntil = nowMs() + 90; // 90ms הבזק
-    m.flashKind = "hit";
->>>>>>> 7d071832341609bee800187d758d7c3e9c3e55b1
 
     // AGGRO: המוב ננעל על השחקן ל-2.5 שניות
     m.aggroUntil = nowMs() + 2500;
@@ -1317,17 +1207,7 @@ function tryAttack() {
     // ליצור טקסט דמג'
     damageTexts.push({
       x: m.x + m.w / 2,
-<<<<<<< HEAD
-<<<<<<< HEAD
       y: m.y,
-=======
-      y: m.y - 40,  // Start higher above mob
-      kind: isCrit ? "crit" : "hit",
->>>>>>> 7d071832341609bee800187d758d7c3e9c3e55b1
-=======
-      y: m.y,
-      kind: "hit",
->>>>>>> parent of 7d071832 (add)
       value: realDamage,
       life: 0.6,
     });
@@ -1828,7 +1708,6 @@ function render() {
     ctx.fillRect(sx, sy, sw, sh);
   }
 
-<<<<<<< HEAD
   // ===== PLAYER NAME ABOVE HEAD =====
   if (currentUsername) {
     const nameX = sx + sw / 2;
@@ -1844,40 +1723,6 @@ function render() {
     ctx.textBaseline = "alphabetic";
   }
 
-=======
-  // player HP bar (above head)
-  ctx.fillStyle = "rgba(255,255,255,0.25)";
-  ctx.fillRect(player.x * scaleX, (player.y - 12) * scaleY, player.w * scaleX, 6 * scaleY);
-  ctx.fillStyle = "rgba(0,255,0,0.7)";
-  ctx.fillRect(
-    player.x * scaleX,
-    (player.y - 12) * scaleY,
-    (player.w * (player.hp / Math.max(1, player.maxHP))) * scaleX,
-    6 * scaleY
-  );
-
-  // ===== EXP BAR (bottom-left) =====
-  const expBarW = 260 * scaleX;
-  const expBarH = 10 * scaleY;
-  const expBx = 12 * scaleX;
-  const expBy = (ORIGINAL_HEIGHT - 20) * scaleY;
-
-  const ratio = player.expToNext > 0 ? (player.exp / player.expToNext) : 0;
-
-  ctx.fillStyle = "rgba(0,0,0,0.45)";
-  ctx.fillRect(expBx, expBy, expBarW, expBarH);
-
-  ctx.fillStyle = "rgba(0,160,255,0.85)";
-  ctx.fillRect(expBx, expBy, expBarW * clamp(ratio, 0, 1), expBarH);
-
-  ctx.fillStyle = "white";
-  ctx.font = `${14 * scaleY}px Arial`;
-  ctx.fillText(
-    `LV ${player.level}  EXP ${Math.floor(player.exp)}/${player.expToNext}`,
-    expBx,
-    expBy - 4 * scaleY
-  );
->>>>>>> parent of 3edecf82 (I built a proper class system with a structured CLASS_DB, where each class actually affects HP, MP, stats, and real damage calculations — not just visuals. I upgraded the HUD to display working MP, added smooth stage transitions, and improved visuals by adding mob shadows for better depth.)
 
   // ===== NPC DRAW =====
   const npcScale = 0.65;
@@ -2108,7 +1953,6 @@ function loop() {
   const dt = Math.min(0.033, (t - lastFrameAt) / 1000);
   lastFrameAt = t;
 
-<<<<<<< HEAD
   // 🔒 לעצור את המשחק עד התחברות
   if (!isLoggedIn) {
     render();
@@ -2132,8 +1976,6 @@ function loop() {
     return;
   }
 
-=======
->>>>>>> parent of 3edecf82 (I built a proper class system with a structured CLASS_DB, where each class actually affects HP, MP, stats, and real damage calculations — not just visuals. I upgraded the HUD to display working MP, added smooth stage transitions, and improved visuals by adding mob shadows for better depth.)
   updatePlayer(dt);
   updateMobs(dt);
   updateDamageTexts(dt);
@@ -2162,12 +2004,7 @@ window.addEventListener("keydown", (e) => {
     if (shopOpen) shopTab = 1;
   }
 
-<<<<<<< HEAD
   // Buy potions when shop is open, USE potions when shop closed
-=======
-
-  // Buy potions when shop is open
->>>>>>> parent of 3edecf82 (I built a proper class system with a structured CLASS_DB, where each class actually affects HP, MP, stats, and real damage calculations — not just visuals. I upgraded the HUD to display working MP, added smooth stage transitions, and improved visuals by adding mob shadows for better depth.)
   if (shopOpen) {
     if (e.code === "Digit1") buyPotion("hp1");
     if (e.code === "Digit2") buyPotion("hp2");
@@ -2250,21 +2087,6 @@ async function boot() {
 
   initQuestState();
   player.expToNext = expNeededForLevel(player.level);
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
-
-  // ✅ אל תנעול קלאס פה. נותנים ברירת מחדל רק כדי שהמשחק לא ישבר לפני בחירה
-  // applyClassBase(player, "warrior"); // ❌ לא
-  if (!player.class || !CLASS_DB[player.class]) {
-    player.class = "warrior";
-  }
-  applyClassBase(player, player.class);
-  player.classLocked = false; // ✅ חשוב
->>>>>>> 7d071832341609bee800187d758d7c3e9c3e55b1
-=======
-  applyClassBase(player, "warrior"); // זמני, אחר כך יהיה מהמסך בחירה
->>>>>>> parent of 7d071832 (add)
   applyLevelStats();
 
   // Load the map for the initial quest
@@ -2345,27 +2167,7 @@ async function boot() {
     }
   });
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
   // ✅ Claim quest reward by clicking the quest progress text
-=======
-  // ✅ WARDROBE BUTTON EVENT
-  UI.wardrobeBtn?.addEventListener("click", () => {
-    UI.menuDropdown?.classList.remove("open");
-    const show = UI.wardrobePanel.style.display !== "block";
-    UI.wardrobePanel.style.display = show ? "block" : "none";
-    if (show) {
-      UI.statsPanel.style.display = "none";
-      UI.invPanel.style.display = "none";
-      makePanelDraggable(UI.wardrobePanel);
-      updateWardrobeDisplay();
-    }
-  });
->>>>>>> 7d071832341609bee800187d758d7c3e9c3e55b1
-=======
-  // ✅ Claim quest reward by clicking the quest progress text
->>>>>>> parent of 7d071832 (add)
 
   let claimingQuest = false;
 
@@ -2388,8 +2190,6 @@ async function boot() {
       claimingQuest = false;
     }
   });
-=======
->>>>>>> parent of 3edecf82 (I built a proper class system with a structured CLASS_DB, where each class actually affects HP, MP, stats, and real damage calculations — not just visuals. I upgraded the HUD to display working MP, added smooth stage transitions, and improved visuals by adding mob shadows for better depth.)
 
   UI.btnAddSTR?.addEventListener("click", () => {
     addSTR();
@@ -2407,37 +2207,7 @@ async function boot() {
   loadMesoFrames();
 
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
   // ===== LOGIN SYSTEM (MongoDB) =====
-=======
-      updateStatsPanelText();
-      updateInvPanelText();
-
-      // hide class screen
-      const classScreen = document.getElementById("classScreen");
-      if (classScreen) classScreen.style.display = "none";
-
-      // start playing
-      startPlaying();
-
-      // אופציונלי: אם זה שחקן חדש בלי שמירה, תעשה save ראשון
-      await saveGameToServer();
-    } catch (err) {
-      const msg = document.getElementById("classMsg");
-      if (msg) msg.textContent = "Failed to choose class: " + err.message;
-      addError("Choose class error: " + err.message);
-    }
-  };
-
-  // =====================================================
-  // ✅ LOGIN SYSTEM (MongoDB)
-  // =====================================================
->>>>>>> 7d071832341609bee800187d758d7c3e9c3e55b1
-=======
-  // ===== LOGIN SYSTEM (MongoDB) =====
->>>>>>> parent of 7d071832 (add)
   function showGameUI() {
     isLoggedIn = true;
     if (UI.loginScreen) UI.loginScreen.style.display = "none";
@@ -2506,7 +2276,12 @@ async function boot() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username: user, password: pass }),
       });
-      const data = await resp.json();
+      const text = await resp.text();
+      let data;
+      try { data = JSON.parse(text); } catch {
+        if (UI.loginMsg) UI.loginMsg.textContent = "Server returned invalid response. Make sure you're accessing the game through http://localhost:3000";
+        return;
+      }
 
       if (!resp.ok) {
         if (UI.loginMsg) UI.loginMsg.textContent = data.error || "Login failed.";
@@ -2538,7 +2313,12 @@ async function boot() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username: user, email, password: pass }),
       });
-      const data = await resp.json();
+      const text = await resp.text();
+      let data;
+      try { data = JSON.parse(text); } catch {
+        if (UI.loginMsg) UI.loginMsg.textContent = "Server returned invalid response. Make sure you're accessing the game through http://localhost:3000";
+        return;
+      }
 
       if (!resp.ok) {
         if (UI.loginMsg) UI.loginMsg.textContent = data.error || "Registration failed.";
@@ -2573,8 +2353,6 @@ async function boot() {
   } else {
     hideGameUI();
   }
-=======
->>>>>>> parent of 3edecf82 (I built a proper class system with a structured CLASS_DB, where each class actually affects HP, MP, stats, and real damage calculations — not just visuals. I upgraded the HUD to display working MP, added smooth stage transitions, and improved visuals by adding mob shadows for better depth.)
 
   requestAnimationFrame(loop);
 }

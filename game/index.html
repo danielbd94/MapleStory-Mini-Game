@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
@@ -19,17 +19,6 @@
       font-family: Arial, sans-serif;
     }
 
-<<<<<<< HEAD
-=======
-    canvas {
-      display:block;
-      width:100%;
-      height:100%;
-      background:#1b1b1b;
-    }
-
-    /* ===== HUD ===== */
->>>>>>> 7d071832341609bee800187d758d7c3e9c3e55b1
     #hud {
       position:fixed;
       top:10px;
@@ -62,7 +51,6 @@
       margin-top:6px;
     }
 
-<<<<<<< HEAD
     /* ===== TOP-RIGHT MENU ===== */
     #gameMenu {
       position: fixed;
@@ -231,40 +219,17 @@
     }
     #respawnBtn:hover { background: #c0392b; }
 
-    /* ============================= */
     /* ===== LOGIN SCREEN ===== */
-    /* ============================= */
-=======
-    /* ===== STATS BUTTON ===== */
-    #statsBtn {
-      position:fixed;
-      right:15px;
-      bottom:15px;
-      z-index:200;
-      padding:10px 14px;
-      font-size:14px;
-      cursor:pointer;
-      border:none;
-      border-radius:8px;
-      background:#2d7cff;
-      color:white;
-      font-weight:bold;
+    #loginScreen {
+      position: fixed;
+      inset: 0;
+      z-index: 9000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #111;
     }
 
-<<<<<<< HEAD
-    /* ===== STATS PANEL ===== */
-    #statsPanel {
-      position:fixed;
-      right:15px;
-      bottom:65px;
-      z-index:200;
-      width:260px;
-      padding:14px;
-      background:rgba(0,0,0,0.85);
-      border-radius:12px;
-      display:none;
-      box-shadow:0 0 15px rgba(0,0,0,0.6);
-=======
     #loginBox {
       width: 360px;
       padding: 22px;
@@ -273,71 +238,8 @@
       border-radius: 14px;
       box-shadow: 0 12px 40px rgba(0,0,0,0.55);
       text-align: center;
->>>>>>> 7d071832341609bee800187d758d7c3e9c3e55b1
     }
 
-    #statsPanel h3 {
-      margin:0 0 8px 0;
-      font-size:16px;
-    }
-
-    #statsPanel button {
-      cursor:pointer;
-      padding:6px;
-      border-radius:6px;
-      border:none;
-      background:#444;
-      color:white;
-      font-weight:bold;
-    }
-
-    #statsPanel button:hover {
-      background:#666;
-    }
-
-    #statsButtons {
-      display:flex;
-      gap:8px;
-      margin-top:10px;
-    }
-
-    /* ===== INVENTORY BUTTON ===== */
-#invBtn {
-  position: fixed;
-  right: 15px;
-  bottom: 115px;
-  z-index: 200;
-  padding: 10px 14px;
-  font-size: 14px;
-  cursor: pointer;
-  border: none;
-  border-radius: 8px;
-  background: #00b36b;
-  color: white;
-  font-weight: bold;
-}
->>>>>>> parent of 3edecf82 (I built a proper class system with a structured CLASS_DB, where each class actually affects HP, MP, stats, and real damage calculations — not just visuals. I upgraded the HUD to display working MP, added smooth stage transitions, and improved visuals by adding mob shadows for better depth.)
-
-/* ===== INVENTORY PANEL ===== */
-#invPanel {
-  position: fixed;
-  right: 15px;
-  bottom: 165px;
-  z-index: 200;
-  width: 260px;
-  padding: 14px;
-  background: rgba(0,0,0,0.85);
-  border-radius: 12px;
-  display: none;
-  box-shadow: 0 0 15px rgba(0,0,0,0.6);
-}
-
-#invPanel h3 {
-  margin: 0 0 8px 0;
-  font-size: 16px;
-}
-
-<<<<<<< HEAD
     #loginTitle {
       font-size: 28px;
       font-weight: 800;
@@ -387,8 +289,6 @@
       color: #ffcc66;
       min-height: 18px;
     }
-=======
->>>>>>> parent of 3edecf82 (I built a proper class system with a structured CLASS_DB, where each class actually affects HP, MP, stats, and real damage calculations — not just visuals. I upgraded the HUD to display working MP, added smooth stage transitions, and improved visuals by adding mob shadows for better depth.)
 
     /* ===== AUTH TABS ===== */
     .authTabs {
@@ -416,14 +316,11 @@
 
     #emailRow { display: none; }
 
-
-
   </style>
 </head>
 
 <body>
 
-<<<<<<< HEAD
   <!-- LOGIN / REGISTER OVERLAY -->
   <div id="loginScreen">
     <div id="loginBox">
@@ -450,33 +347,26 @@
   </div>
 
   <!-- HUD -->
-=======
->>>>>>> parent of 3edecf82 (I built a proper class system with a structured CLASS_DB, where each class actually affects HP, MP, stats, and real damage calculations — not just visuals. I upgraded the HUD to display working MP, added smooth stage transitions, and improved visuals by adding mob shadows for better depth.)
   <div id="hud">
     <div id="questTitle"></div>
     <div id="questDesc"></div>
     <div id="questProgress"></div>
     <div id="playerStats"></div>
-    <div class="small">Move: ← → | Jump: ↑ | Attack: Space</div>
+    <div class="small">Move:   | Jump:  | Attack: Space</div>
     <div id="errors"></div>
   </div>
 
-<<<<<<< HEAD
   <!-- TOP-RIGHT MENU -->
   <div id="gameMenu">
-    <button id="menuToggle">☰ Menu</button>
+    <button id="menuToggle"> Menu</button>
     <div id="menuDropdown">
-      <button class="menuItem" id="statsBtn">📊 Stats</button>
-      <button class="menuItem" id="invBtn">🎒 Inventory</button>
+      <button class="menuItem" id="statsBtn">Stats</button>
+      <button class="menuItem" id="invBtn">Inventory</button>
       <div class="menuDivider"></div>
-      <button class="menuItem save" id="saveBtn">💾 Save Game</button>
-      <button class="menuItem danger" id="logoutBtn">🚪 Logout</button>
+      <button class="menuItem save" id="saveBtn">Save Game</button>
+      <button class="menuItem danger" id="logoutBtn">Logout</button>
     </div>
   </div>
-=======
-  <!-- STATS BUTTON -->
-  <button id="statsBtn">Stats</button>
->>>>>>> parent of 3edecf82 (I built a proper class system with a structured CLASS_DB, where each class actually affects HP, MP, stats, and real damage calculations — not just visuals. I upgraded the HUD to display working MP, added smooth stage transitions, and improved visuals by adding mob shadows for better depth.)
 
   <!-- STATS PANEL -->
   <div id="statsPanel">
@@ -493,17 +383,10 @@
     </div>
   </div>
 
-<<<<<<< HEAD
-=======
-    <!-- INVENTORY BUTTON -->
-  <button id="invBtn">Inventory</button>
-
->>>>>>> parent of 3edecf82 (I built a proper class system with a structured CLASS_DB, where each class actually affects HP, MP, stats, and real damage calculations — not just visuals. I upgraded the HUD to display working MP, added smooth stage transitions, and improved visuals by adding mob shadows for better depth.)
   <!-- INVENTORY PANEL -->
   <div id="invPanel">
     <h3>Inventory</h3>
     <div id="invInfo">Mesos: 0</div>
-<<<<<<< HEAD
     <div id="invPotions"></div>
     <div style="margin-top:8px; font-size:12px; opacity:0.5;">Keys 1-6 to use potions</div>
   </div>
@@ -513,18 +396,12 @@
     <h1>YOU DIED</h1>
     <p>Your quest progress has been reset.</p>
     <button id="respawnBtn">Respawn</button>
-=======
-    <div style="margin-top:8px; font-size:12px; opacity:.8;">
-      Press I to open.
-    </div>
->>>>>>> parent of 3edecf82 (I built a proper class system with a structured CLASS_DB, where each class actually affects HP, MP, stats, and real damage calculations — not just visuals. I upgraded the HUD to display working MP, added smooth stage transitions, and improved visuals by adding mob shadows for better depth.)
   </div>
-
 
   <canvas id="c"></canvas>
 
   <script>
-    // ── Auth tab switching (runs before game.js) ──
+    // Auth tab switching (runs before game.js)
     function switchAuthTab(tab) {
       const tabLogin    = document.getElementById("tabLogin");
       const tabRegister = document.getElementById("tabRegister");
@@ -552,13 +429,4 @@
   <script src="./game.js"></script>
 
 </body>
-<<<<<<< HEAD
-<<<<<<< HEAD
 </html>
-=======
-
-</html>
->>>>>>> 7d071832341609bee800187d758d7c3e9c3e55b1
-=======
-</html>
->>>>>>> parent of 7d071832 (add)
