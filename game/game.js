@@ -2,6 +2,45 @@ const canvas = document.getElementById("c");
 const ctx = canvas.getContext("2d");
 ctx.imageSmoothingEnabled = false;
 
+// ===== Audio =====
+const BGM_MP3 = "./assets/sounds/perion.mp3";
+const STUMP_HIT_MP3 = "./assets/sounds/stump.mp3";
+const POTION_USE_MP3 = "./assets/sounds/potion.mp3";
+
+const bgmAudio = new Audio(BGM_MP3);
+bgmAudio.loop = true;
+bgmAudio.volume = 0.42;
+bgmAudio.preload = "auto";
+let bgmStarted = false;
+
+const stumpHitAudio = new Audio(STUMP_HIT_MP3);
+stumpHitAudio.volume = 0.8;
+stumpHitAudio.preload = "auto";
+let lastStumpHitSfxAt = 0;
+const STUMP_HIT_SFX_COOLDOWN_MS = 120;
+
+const potionUseAudio = new Audio(POTION_USE_MP3);
+potionUseAudio.volume = 0.6;
+potionUseAudio.preload = "auto";
+
+function ensureBgmStarted() {
+  if (bgmStarted) return;
+  // Only mark started after play succeeds; otherwise retries (e.g. autoplay) keep working.
+  bgmAudio.play()
+    .then(() => { bgmStarted = true; })
+    .catch(() => {});
+}
+
+function playStumpHitSfx() {
+  const t = performance.now();
+  if (t - lastStumpHitSfxAt < STUMP_HIT_SFX_COOLDOWN_MS) return;
+  lastStumpHitSfxAt = t;
+  stumpHitAudio.currentTime = 0;
+  stumpHitAudio.play().catch(() => {});
+}
+
+window.addEventListener("pointerdown", ensureBgmStarted, { passive: true });
+
 // Original design size for scaling calculations
 const ORIGINAL_WIDTH = 960;
 const ORIGINAL_HEIGHT = 540;
@@ -21,11 +60,14 @@ resizeCanvas();
 window.addEventListener("resize", resizeCanvas);
 
 const UI = {
+  questPanel: document.getElementById("questPanel"),
+  questClose: document.getElementById("questClose"),
   questTitle: document.getElementById("questTitle"),
   questDesc: document.getElementById("questDesc"),
   questProgress: document.getElementById("questProgress"),
   playerStats: document.getElementById("playerStats"),
   errors: document.getElementById("errors"),
+  saveStatus: document.getElementById("saveStatus"),
 
   // NEW: stats panel
   statsBtn: document.getElementById("statsBtn"),
@@ -38,12 +80,23 @@ const UI = {
   // ✅ INVENTORY
   invBtn: document.getElementById("invBtn"),
   invPanel: document.getElementById("invPanel"),
+  invClose: document.getElementById("invClose"),
   invInfo: document.getElementById("invInfo"),
+
+  // ===== CHAT =====
+  chatPanel: document.getElementById("chatPanel"),
+  chatHeader: document.getElementById("chatHeader"),
+  chatExpandBtn: document.getElementById("chatExpandBtn"),
+  chatMessages: document.getElementById("chatMessages"),
+  chatInputRow: document.getElementById("chatInputRow"),
+  chatInput: document.getElementById("chatInput"),
+  chatSendBtn: document.getElementById("chatSendBtn"),
 
   // ===== TOP-RIGHT MENU =====
   gameMenu: document.getElementById("gameMenu"),
   menuToggle: document.getElementById("menuToggle"),
   menuDropdown: document.getElementById("menuDropdown"),
+  questBtn: document.getElementById("questBtn"),
 
   // ===== LOGIN =====
   loginScreen: document.getElementById("loginScreen"),
@@ -69,6 +122,8 @@ const CONFIG = {
 
   playerSpeed: 240,
   playerDamage: 2,
+  // Multiplier applied to STR scaling for stronger early-game hits.
+  damageMultiplier: 3,
   attackCooldownMs: 220,
 
   // NEW: physics
@@ -83,6 +138,9 @@ const CONFIG = {
   mobWanderSwitchMsMax: 2200,
 
   fps: 10,
+  // Idle/standing animation speed (player only).
+  // Lower this so the "stand" frames don't cycle too fast.
+  standFps: 4,
   hitStateMs: 250,
   dieStateMs: 900,
 
@@ -184,6 +242,8 @@ const shopNpc = { x: 745, y: 0, w: 50, h: 70 };
 
 const shopNpcImg = new Image();
 let shopOpen = false;
+/** Screen-space hit rect for the shop close control (set while shop is drawn). */
+let shopCloseHit = null;
 shopNpcImg.src = "./assets/ui/npc/npc.png";
 
 // ===== SHOP UI IMAGES (tabs) =====
@@ -271,7 +331,7 @@ function applyClassBase(p, classKey) {
 function applyLevelStats() {
   // STR מעלה דמג'
   // STR raises damage: +1 damage per STR point
-  player.damage = CONFIG.playerDamage + (player.str || 0) * 1;
+  player.damage = (CONFIG.playerDamage + (player.str || 0) * 1) * (CONFIG.damageMultiplier ?? 1);
 
   // VIT raises max HP: +6 HP per VIT point (changed from 3 -> 6)
   const oldMax = player.maxHP;
@@ -331,7 +391,9 @@ function buyPotion(potionId) {
   if (!p) return;
 
   if (playerMesos < p.price) {
-    addError("Not enough Mesos!");
+    // Show in chat log instead of the top error box.
+    if (!chatExpanded) setChatExpanded(true);
+    addChatSystemLine("Not enough Mesos!", "#ffcc66");
     return;
   }
 
@@ -353,16 +415,17 @@ function usePotion(potionId) {
 
   inv[potionId] -= 1;
 
+  potionUseAudio.currentTime = 0;
+  potionUseAudio.play().catch(() => {});
+
   if (p.type === "hp") {
     const before = player.hp;
     player.hp = Math.min(player.hp + p.heal, player.maxHP);
     const healed = player.hp - before;
-    addError(`Used ${p.name}: +${healed} HP`);
   } else if (p.type === "mp") {
     const before = player.mp;
     player.mp = Math.min(player.mp + p.heal, player.maxMP);
     const healed = player.mp - before;
-    addError(`Used ${p.name}: +${healed} MP`);
   }
 
   updateInvPanelText();
@@ -375,13 +438,48 @@ let statsOpen = false;
 // ===== INVENTORY UI =====
 let invOpen = false;
 
+let questOpen = false;
+
+function setQuestOpen(v) {
+  questOpen = !!v;
+  if (UI.questPanel) UI.questPanel.style.display = questOpen ? "block" : "none";
+}
+
+/** One of stats / inventory / quest can be open at a time (menu + hotkeys). */
+function toggleStatsPanel() {
+  const next = !statsOpen;
+  setStatsOpen(next);
+  if (next) {
+    setInvOpen(false);
+    setQuestOpen(false);
+  }
+}
+
+function toggleInvPanel() {
+  const next = !invOpen;
+  setInvOpen(next);
+  if (next) {
+    setStatsOpen(false);
+    setQuestOpen(false);
+    updateInvPanelText();
+  }
+}
+
+function toggleQuestPanel() {
+  const next = !questOpen;
+  setQuestOpen(next);
+  if (next) {
+    setStatsOpen(false);
+    setInvOpen(false);
+  }
+}
+
 function setInvOpen(v) {
   invOpen = v;
   if (UI.invPanel) {
     UI.invPanel.style.display = invOpen ? "block" : "none";
   }
 
-  // ✅ תוסיף את זה
   if (invOpen) updateInvPanelText();
 }
 
@@ -409,18 +507,9 @@ function updateInvPanelText() {
 }
 
 
-function toggleInv() {
-  setInvOpen(!invOpen);
-}
-
-
 function setStatsOpen(v) {
   statsOpen = v;
   if (UI.statsPanel) UI.statsPanel.style.display = statsOpen ? "block" : "none";
-}
-
-function toggleStats() {
-  setStatsOpen(!statsOpen);
 }
 
 function updateStatsPanelText() {
@@ -516,7 +605,7 @@ const playerFrames = new Map();
 
 // ===== MESOS (multi types + animated frames) =====
 let mesos = [];
-let playerMesos = 0;
+let playerMesos = 50000;
 
 // ===== POTION INVENTORY =====
 const inv = {
@@ -766,7 +855,9 @@ function getPlayerFrame(anim, tMs) {
   const frames = playerFrames.get(anim);
   if (!frames || frames.length === 0) return null;
 
-  const idx = Math.floor((tMs / 1000) * CONFIG.fps) % frames.length;
+  // Use a slower frame rate for idle to avoid "fast standing" visuals.
+  const fps = anim === "stand" ? (CONFIG.standFps ?? CONFIG.fps) : CONFIG.fps;
+  const idx = Math.floor((tMs / 1000) * fps) % frames.length;
   return frames[idx] ?? null;
 }
 
@@ -902,7 +993,8 @@ async function applyGameData(gd) {
   player.maxHP = gd.maxHP ?? player.maxHP;
   player.mp    = gd.mp    ?? player.mp;
   player.maxMP = gd.maxMP ?? player.maxMP;
-  player.damage = gd.damage ?? player.damage;
+  // Player.damage is derived from STR and CONFIG in applyLevelStats().
+  // Don't override it with possibly stale saved values.
 
   // Safety: don't load into a dead state — heal to full
   if (player.hp <= 0) player.hp = player.maxHP;
@@ -919,6 +1011,14 @@ async function applyGameData(gd) {
   if (gd.inventory) {
     for (const k of Object.keys(inv)) {
       inv[k] = gd.inventory[k] ?? inv[k];
+    }
+
+    // If an old save (or fresh one) contains no potions at all, initialize the defaults.
+    // This keeps the "start with 5 potions each" behavior stable across existing saves.
+    const totalPotions = Object.values(inv).reduce((sum, v) => sum + (Number(v) || 0), 0);
+    if (totalPotions === 0) {
+      inv.hp1 = 5; inv.hp2 = 5; inv.hp3 = 5;
+      inv.mp1 = 5; inv.mp2 = 5; inv.mp3 = 5;
     }
   }
 
@@ -954,10 +1054,24 @@ async function applyGameData(gd) {
   player.onGround = true;
 
   await refreshNeededAssets();
+
+  // Refresh visible panels after loading so UI matches restored state.
+  if (invOpen) updateInvPanelText();
+  if (statsOpen) updateStatsPanelText();
+  renderQuestUI();
 }
 
 async function saveGameToServer() {
   if (!authToken) return;
+
+  function formatTime(d) {
+    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  }
+
+  function setSaveStatus(text) {
+    if (UI.saveStatus) UI.saveStatus.textContent = text;
+  }
+
   try {
     const resp = await fetch(`${API_BASE}/game/save`, {
       method: "POST",
@@ -969,11 +1083,13 @@ async function saveGameToServer() {
     try { data = JSON.parse(text); } catch { data = {}; }
     if (!resp.ok) {
       addError("Save failed: " + (data.error || "unknown"));
+      setSaveStatus(`Save failed @ ${formatTime(new Date())}: ${data.error || "unknown"}`);
     } else {
-      addError("Game saved!");
+      setSaveStatus(`Game saved @ ${formatTime(new Date())}`);
     }
   } catch (err) {
     addError("Save error: " + err.message);
+    setSaveStatus(`Save error @ ${formatTime(new Date())}: ${err.message}`);
   }
 }
 
@@ -1010,6 +1126,236 @@ let mobs = [];
 let lastSpawnAt = 0;
 let damageTexts = [];
 
+// ===== CHAT =====
+let chatHistory = []; // { from, text, at }
+let chatBubbles = []; // { bornMs, untilMs, x, y, w, h, lines, fontSizePx, lineHeight, padX, padY }
+let chatExpanded = false;
+
+/** Set true when the player must click the quest panel to advance (reserved for future use). */
+let questReadyToClaim = false;
+
+const STUMPY_MOB_ID = 3220000;
+const STUMPY_ANNOUNCE_COOLDOWN_MS = 8000;
+let lastStumpyAnnounceMs = -STUMPY_ANNOUNCE_COOLDOWN_MS;
+
+function escapeHtml(s) {
+  return String(s)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function addChatSystemLine(text, color = "#00ffff") {
+  if (!UI.chatMessages) return;
+  const safe = escapeHtml(text);
+  const lineHtml =
+    `<div class="chatLine">` +
+    `<span style="color:${color}; font-weight:900;">${safe}</span>` +
+    `</div>`;
+
+  UI.chatMessages.insertAdjacentHTML("beforeend", lineHtml);
+  UI.chatMessages.scrollTop = UI.chatMessages.scrollHeight;
+
+  chatHistory.push({ from: "System", text, at: Date.now() });
+}
+
+function setChatExpanded(v) {
+  chatExpanded = !!v;
+  const panel = UI.chatPanel;
+  if (!panel) return;
+
+  if (!chatExpanded) {
+    // Clear inline height so the CSS `.collapsed` height can take effect.
+    panel.dataset.prevChatH = panel.style.height || "";
+    panel.dataset.prevChatW = panel.style.width || "";
+    panel.style.height = "";
+    panel.classList.add("collapsed");
+  } else {
+    panel.classList.remove("collapsed");
+
+    // Restore last user size (prefer localStorage, fallback to dataset).
+    try {
+      const rw = localStorage.getItem("chatPanelW");
+      const rh = localStorage.getItem("chatPanelH");
+      if (rw) panel.style.width = `${parseInt(rw, 10)}px`;
+      const prevH = panel.dataset.prevChatH || "";
+      const restoredH = rh ? `${parseInt(rh, 10)}px` : prevH;
+      if (restoredH) panel.style.height = restoredH;
+    } catch (_) {
+      const prevH = panel.dataset.prevChatH || "";
+      if (prevH) panel.style.height = prevH;
+    }
+  }
+
+  if (UI.chatExpandBtn) UI.chatExpandBtn.textContent = chatExpanded ? "▲" : "▼";
+  if (chatExpanded) UI.chatInput?.focus();
+}
+
+function wrapTextByWidth(text, maxWidthPx) {
+  const words = String(text).split(/\s+/).filter(Boolean);
+  const lines = [];
+  let line = "";
+
+  for (const w of words) {
+    const test = line ? `${line} ${w}` : w;
+    if (ctx.measureText(test).width <= maxWidthPx) {
+      line = test;
+      continue;
+    }
+
+    // if a single word is too long, hard-split it
+    if (!line) {
+      let part = "";
+      for (const ch of w) {
+        const testPart = part + ch;
+        if (ctx.measureText(testPart).width > maxWidthPx) {
+          if (part) lines.push(part);
+          part = ch;
+          // If a single character is already too wide, still push it (can't do better).
+          if (ctx.measureText(part).width > maxWidthPx) {
+            lines.push(part);
+            part = "";
+          }
+        } else {
+          part = testPart;
+        }
+      }
+      if (part) lines.push(part);
+      line = "";
+    } else {
+      lines.push(line);
+      line = w;
+    }
+  }
+
+  if (line) lines.push(line);
+  return lines;
+}
+
+function layoutChatBubble(fullText, atMs) {
+  const fontSizePx = Math.round(11 * scaleY);
+  ctx.font = `bold ${fontSizePx}px Arial`;
+  const lineHeight = Math.round(fontSizePx * 1.15);
+  const padX = Math.round(6 * scaleX);
+  const padY = Math.round(4 * scaleY);
+  // Cap bubble width so long messages wrap into a couple rows.
+  const maxWrap = Math.round(140 * scaleX);
+  const wrapMaxWidth = Math.max(36 * scaleX, maxWrap - padX * 2);
+  const maxRows = 7;
+
+  let lines = wrapTextByWidth(fullText, wrapMaxWidth);
+
+  // Hard cap height (max rows) and ensure last line still fits.
+  if (lines.length > maxRows) {
+    lines = lines.slice(0, maxRows);
+    const ell = "…";
+    let last = lines[maxRows - 1] || "";
+    // Trim until it fits with an ellipsis.
+    while (last.length > 0 && ctx.measureText(last + ell).width > wrapMaxWidth) {
+      last = last.slice(0, -1);
+    }
+    lines[maxRows - 1] = (last ? last + ell : ell);
+  }
+
+  // Keep bubble width fixed so nothing can overflow horizontally.
+  const bubbleW = Math.ceil(wrapMaxWidth + padX * 2);
+  const bubbleH = lineHeight * lines.length + padY * 2;
+  const lifeMs = 5000;
+
+  return {
+    bornMs: atMs,
+    untilMs: atMs + lifeMs,
+    w: bubbleW,
+    h: bubbleH,
+    lines,
+    fontSizePx,
+    lineHeight,
+    padX,
+    padY,
+  };
+}
+
+function sendChatMessage() {
+  const from = currentUsername || "Player";
+  const input = UI.chatInput;
+  if (!input) return;
+
+  const text = input.value.trim();
+  if (!text) return;
+
+  input.value = "";
+  const fullText = `${from}: ${text}`;
+  const atMs = nowMs();
+
+  chatHistory.push({ from, text, at: Date.now() });
+  if (UI.chatMessages) {
+    const lineHtml =
+      `<div class="chatLine">` +
+      `<span class="chatName">${escapeHtml(from)}:</span>` +
+      `<span class="chatText">${escapeHtml(text)}</span>` +
+      `</div>`;
+    UI.chatMessages.insertAdjacentHTML("beforeend", lineHtml);
+    UI.chatMessages.scrollTop = UI.chatMessages.scrollHeight;
+  }
+
+  chatBubbles.push(layoutChatBubble(fullText, atMs));
+}
+
+function drawRoundedRectPath(x, y, w, h, r) {
+  const rr = Math.min(r, w / 2, h / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + rr, y);
+  ctx.arcTo(x + w, y, x + w, y + h, rr);
+  ctx.arcTo(x + w, y + h, x, y + h, rr);
+  ctx.arcTo(x, y + h, x, y, rr);
+  ctx.arcTo(x, y, x + w, y, rr);
+  ctx.closePath();
+}
+
+function renderChatBubbles(tMs) {
+  if (!chatBubbles.length) return;
+
+  chatBubbles = chatBubbles.filter(b => tMs < b.untilMs);
+
+  // Keep bubbles attached to the player (reposition every frame).
+  const pbox = playerBox();
+  const feetY = pbox.y + pbox.h;
+  const drawY = feetY - player.h;
+  const sx = player.x * scaleX;
+  const sy = drawY * scaleY;
+  const sw = player.w * scaleX;
+  const anchorY = sy - 6 * scaleY;
+
+  for (const b of chatBubbles) {
+    // Align right edge similarly to the player name pill.
+    const x = sx + sw - b.w + 2 * scaleX;
+    const y = anchorY - b.h;
+
+    ctx.save();
+    drawRoundedRectPath(x, y, b.w, b.h, Math.round(4 * scaleX));
+    ctx.fillStyle = "rgba(255,255,255,0.88)";
+    ctx.strokeStyle = "rgba(0,0,0,0.65)";
+    ctx.lineWidth = Math.max(0.8, 1 * scaleX);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.font = `bold ${b.fontSizePx}px Arial`;
+    ctx.fillStyle = "#111111";
+    ctx.textBaseline = "top";
+
+    for (let i = 0; i < b.lines.length; i++) {
+      const ln = b.lines[i];
+      const tx = x + b.padX;
+      const ty = y + b.padY + i * b.lineHeight;
+      ctx.fillText(ln, tx, ty);
+    }
+
+    ctx.restore();
+  }
+}
+
 
 function getMobStat(mobId, key, fallback) {
   const s = mobStatsMap.get(Number(mobId));
@@ -1033,6 +1379,17 @@ function spawnMob(mobId, x, platform = null) {
   const stats = mobStatsMap.get(Number(mobId));
   if (!stats) throw new Error(`Missing mob stats for id=${mobId}.`);
 
+  const idNum = Number(mobId);
+  if (idNum === STUMPY_MOB_ID) {
+    const t = nowMs();
+    if (t - lastStumpyAnnounceMs >= STUMPY_ANNOUNCE_COOLDOWN_MS) {
+      lastStumpyAnnounceMs = t;
+      // Make sure the player can actually see the message.
+      if (!chatExpanded) setChatExpanded(true);
+      addChatSystemLine("Stomp! Stomp! Stomp! Stumpy has appread!", "#00ffff");
+    }
+  }
+
   const maxHP = getMobStat(mobId, "maxHP", 10);
   const exp = getMobStat(mobId, "exp", 0);
 
@@ -1051,6 +1408,8 @@ function spawnMob(mobId, x, platform = null) {
     dead: false,
     dir: Math.random() < 0.5 ? -1 : 1,
     speed: computeMobSpeedPxPerSec(mobId),
+    vx: 0,
+    wanderPauseUntil: 0,
     nextWanderSwitchAt: nowMs() + randBetween(CONFIG.mobWanderSwitchMsMin, CONFIG.mobWanderSwitchMsMax),
     aggroUntil: 0,
 
@@ -1069,6 +1428,10 @@ function intersects(a, b) {
     a.y < b.y + b.h &&
     a.y + a.h > b.y
   );
+}
+
+function pointInRect(px, py, r) {
+  return px >= r.x && px <= r.x + r.w && py >= r.y && py <= r.y + r.h;
 }
 function playerBoxAt(x, y) {
   return {
@@ -1181,6 +1544,7 @@ function tryAttack() {
     h: player.h - 20,
   };
 
+  let didHitMob = false;
   for (const m of mobs) {
     if (m.dead) continue;
     if (!intersects(atk, m)) continue;
@@ -1189,9 +1553,14 @@ function tryAttack() {
     const realDamage = Math.min(player.damage, m.hp);
 
     m.hp -= realDamage;
+    if (realDamage > 0) didHitMob = true;
 
     // AGGRO: המוב ננעל על השחקן ל-2.5 שניות
-    m.aggroUntil = nowMs() + 2500;
+    // Chase for a random duration after being hit.
+    // If the player stops hitting, this timer runs out and it returns to patrolling.
+    const chaseMs = randBetween(CONFIG.mobAggroMinMs ?? 1500, CONFIG.mobAggroMaxMs ?? 4500);
+    m.aggroUntil = t + chaseMs;
+    m.lastHitAt = t;
 
     // ===== KNOCKBACK =====
     const knockbackForce = 5;
@@ -1235,6 +1604,8 @@ function tryAttack() {
       setMobState(m, "hit", CONFIG.hitStateMs);
     }
   }
+
+  if (didHitMob) playStumpHitSfx();
 }
 
 function buildQuestIndex(db) {
@@ -1515,53 +1886,69 @@ function updatePlayer(dt) {
 }
 
 
-// ===== UPDATED: Mobs move on their platform and flip direction =====
+// ===== Mobs move more naturally (smooth velocity + occasional pauses) =====
 function updateMobs(dt) {
   const t = nowMs();
 
   for (const m of mobs) {
     if (m.dead) continue;
-
     if (m.state === "hit" && t < m.stateUntil) continue;
 
     const aggroActive = t < (m.aggroUntil || 0);
+    const p = m.platform || { x: 0, w: ORIGINAL_WIDTH };
 
-    let dx = 0;
+    let desiredVx = 0; // px/sec
 
     if (aggroActive && m.platform === player.onPlatform) {
       // ===== CHASE PLAYER (AGGRO) =====
       const dxToPlayer = (player.x + player.w / 2) - (m.x + m.w / 2);
       m.dir = dxToPlayer >= 0 ? 1 : -1;
-
-      dx = m.dir * m.speed * 1.25 * dt; // קצת יותר מהר כשהוא אגרסיבי
-      m.x += dx;
-
+      desiredVx = m.dir * m.speed * 1.25; // slightly faster when aggressive
     } else {
-      // ===== WANDER =====
+      // ===== WANDER (with pauses) =====
       if (t >= m.nextWanderSwitchAt) {
         m.dir = Math.random() < 0.5 ? -1 : 1;
         m.nextWanderSwitchAt =
           t + randBetween(CONFIG.mobWanderSwitchMsMin, CONFIG.mobWanderSwitchMsMax);
+
+        // Pause sometimes so movement isn't constant/jittery.
+        // Longer, occasional stand-still pauses during wandering.
+        const pauseChance = 0.55;
+        m.wanderPauseUntil = t + (Math.random() < pauseChance ? randBetween(350, 1400) : 0);
       }
 
-      dx = m.dir * m.speed * dt;
-      m.x += dx;
+      if (t >= (m.wanderPauseUntil || 0)) {
+        desiredVx = m.dir * m.speed;
+      }
     }
 
+    // ===== Smooth velocity changes =====
+    const currentVx = m.vx ?? 0;
+    const desiredDelta = desiredVx - currentVx;
+    const maxChange = (m.speed * 8 + 80) * dt; // px/sec change per frame
+    m.vx = currentVx + clamp(desiredDelta, -maxChange, maxChange);
+
+    m.x += m.vx * dt;
+
     // ===== PLATFORM BOUNDS =====
-    const p = m.platform || { x: 0, w: ORIGINAL_WIDTH };
     const minX = p.x;
     const maxX = p.x + p.w - m.w;
 
-    if (m.x < minX) { m.x = minX; m.dir = 1; }
-    if (m.x > maxX) { m.x = maxX; m.dir = -1; }
-    m.x = Math.max(minX, Math.min(m.x, maxX));
+    if (m.x < minX) {
+      m.x = minX;
+      m.vx = 0;
+      m.dir = 1;
+    } else if (m.x > maxX) {
+      m.x = maxX;
+      m.vx = 0;
+      m.dir = -1;
+    }
 
     // keep y glued to platform top
     m.y = mobYOnPlatform(p, m.h);
 
     // state based on movement
-    m.state = Math.abs(dx) > 0.01 ? "move" : "stand";
+    m.state = Math.abs(m.vx) > 5 ? "move" : "stand";
   }
 
   mobs = mobs.filter(m => !(m.dead && m.state === "die" && nowMs() >= m.stateUntil));
@@ -1708,20 +2095,38 @@ function render() {
     ctx.fillRect(sx, sy, sw, sh);
   }
 
-  // ===== PLAYER NAME ABOVE HEAD =====
+  // ===== PLAYER NAME (compact tag, right-aligned to sprite) =====
   if (currentUsername) {
-    const nameX = sx + sw / 2;
-    const nameY = sy - 6 * scaleY;
-    ctx.font = `bold ${Math.round(12 * scaleY)}px Arial`;
-    ctx.textAlign = "center";
-    ctx.textBaseline = "bottom";
-    ctx.fillStyle = "rgba(0,0,0,0.6)";
-    ctx.fillText(currentUsername, nameX + 1, nameY + 1);
-    ctx.fillStyle = "#ffffff";
-    ctx.fillText(currentUsername, nameX, nameY);
+    const userFontSize = Math.round(11 * scaleY);
+    ctx.font = `bold ${userFontSize}px Arial`;
+    const padX = Math.round(6 * scaleX);
+    const padY = Math.round(3 * scaleY);
+    const unameW = ctx.measureText(currentUsername).width;
+    const rectW = Math.ceil(unameW + padX * 2);
+    const rectH = Math.round(userFontSize + padY * 2);
+    // When facing left, the sprite is drawn as-is; anchor the pill to the left edge
+    // so it stays visually aligned while moving.
+    const rectX = player.facing === -1
+      ? sx - 2 * scaleX
+      : (sx + sw - rectW + 2 * scaleX);
+    const rectY = sy + sh + Math.round(3 * scaleY);
+
+    drawRoundedRectPath(rectX, rectY, rectW, rectH, Math.round(4 * scaleX));
+    ctx.fillStyle = "rgba(0,0,0,0.62)";
+    ctx.fill();
+    ctx.strokeStyle = "rgba(255,255,255,0.14)";
+    ctx.lineWidth = Math.max(0.8, 1 * scaleX);
+    ctx.stroke();
+
+    ctx.textBaseline = "middle";
     ctx.textAlign = "left";
-    ctx.textBaseline = "alphabetic";
+    ctx.fillStyle = "rgba(255,255,255,0.95)";
+    ctx.fillText(currentUsername, rectX + padX, rectY + rectH / 2);
+    ctx.textAlign = "start";
   }
+
+  // Chat bubbles on the canvas
+  renderChatBubbles(t);
 
 
   // ===== NPC DRAW =====
@@ -1811,6 +2216,7 @@ function render() {
   ctx.textAlign = "start";
 
   // ===== SHOP UI (ONLY IF OPEN) =====
+  shopCloseHit = null;
   if (shopOpen) {
     const SHOP_SCALE = 0.55;        // קטן יותר (תשנה ל-0.5/0.6 לפי טעם)
     const SHOP_ANCHOR = "center"; // center / rightMid / rightBottom
@@ -1843,6 +2249,28 @@ function render() {
       ctx.fillStyle = "rgba(0,0,0,0.7)";
       ctx.fillRect(shopBx, shopBy, imgW, imgH);
     }
+
+    const closeBtn = Math.round(Math.min(28 * scaleY, imgH * 0.075));
+    shopCloseHit = {
+      x: shopBx + imgW - closeBtn - Math.round(8 * scaleX),
+      y: shopBy + Math.round(8 * scaleY),
+      w: closeBtn,
+      h: closeBtn,
+    };
+    const cr = shopCloseHit;
+    drawRoundedRectPath(cr.x, cr.y, cr.w, cr.h, Math.min(8, cr.w * 0.28));
+    ctx.fillStyle = "rgba(255,255,255,0.06)";
+    ctx.strokeStyle = "rgba(255,255,255,0.12)";
+    ctx.lineWidth = 1;
+    ctx.fill();
+    ctx.stroke();
+    ctx.font = `800 ${Math.round(cr.h * 0.42)}px Arial`;
+    ctx.fillStyle = "#fff";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("×", cr.x + cr.w / 2, cr.y + cr.h / 2 + 1);
+    ctx.textAlign = "start";
+    ctx.textBaseline = "alphabetic";
 
     // DEBUG: draw tab hitboxes as colored rectangles
     // for (const hb of SHOP_TAB_HITBOX) {
@@ -1990,12 +2418,48 @@ function loop() {
 }
 
 window.addEventListener("keydown", (e) => {
+  const chatInputEl = UI.chatInput;
+  const isMainEnter = e.code === "Enter" || e.code === "NumpadEnter";
+  const raw = chatInputEl ? chatInputEl.value.trim() : "";
+
+  // Enter behavior:
+  // 1) Press Enter anywhere => focus chat (open if collapsed).
+  // 2) Press Enter again while chat is focused & empty => minimize chat.
+  // 3) Press Enter again => open chat and focus it again.
+  if (isMainEnter) {
+    ensureBgmStarted();
+
+    if (!chatExpanded) {
+      setChatExpanded(true);
+      e.preventDefault();
+      requestAnimationFrame(() => chatInputEl?.focus());
+      return;
+    }
+
+    if (chatInputEl && document.activeElement === chatInputEl) {
+      if (!raw) {
+        e.preventDefault();
+        setChatExpanded(false);
+      }
+      // If raw is non-empty, let the chat input handler send the message.
+      return;
+    }
+
+    e.preventDefault();
+    chatInputEl?.focus();
+    return;
+  }
+
+  // Don't move/attack while typing chat (except Enter, handled above).
+  if (chatInputEl && document.activeElement === chatInputEl) return;
+
+  ensureBgmStarted();
+
   if (e.code === "Space") e.preventDefault();
   keys.add(e.code);
 
   if (e.code === "ArrowUp") tryJump();
   if (e.code === "Space") tryAttack();
-  if (e.code === "KeyI") toggleInv();
 
   // ===== SHOP SYSTEM =====
 
@@ -2016,6 +2480,19 @@ window.addEventListener("keydown", (e) => {
 
     if (e.code === "Escape") shopOpen = false;
   } else {
+    if (e.code === "KeyI") {
+      e.preventDefault();
+      toggleInvPanel();
+    }
+    if (e.code === "KeyS") {
+      e.preventDefault();
+      toggleStatsPanel();
+    }
+    if (e.code === "KeyQ") {
+      e.preventDefault();
+      toggleQuestPanel();
+    }
+
     // Use potions from hotbar (keys 1-6)
     if (e.code === "Digit1") usePotion("hp1");
     if (e.code === "Digit2") usePotion("hp2");
@@ -2028,12 +2505,25 @@ window.addEventListener("keydown", (e) => {
 
 window.addEventListener("keyup", (e) => keys.delete(e.code));
 
+// If the window/tab loses focus, keyup might not fire (leaving keys stuck).
+// Clear pressed keys so the player doesn't keep walking sideways.
+window.addEventListener("blur", () => keys.clear());
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) keys.clear();
+});
+
 canvas.addEventListener("mousedown", (e) => {
+  ensureBgmStarted();
   if (!shopOpen || !lastShopRect) return;
 
   const r = canvas.getBoundingClientRect();
   const mx = (e.clientX - r.left) * (canvas.width / r.width);
   const my = (e.clientY - r.top) * (canvas.height / r.height);
+
+  if (shopCloseHit && pointInRect(mx, my, shopCloseHit)) {
+    shopOpen = false;
+    return;
+  }
 
   // Click outside shop => close
   if (
@@ -2151,23 +2641,193 @@ async function boot() {
 
   UI.statsBtn?.addEventListener("click", () => {
     UI.menuDropdown?.classList.remove("open");
-    const show = UI.statsPanel.style.display !== "block";
-    UI.statsPanel.style.display = show ? "block" : "none";
-    if (show) UI.invPanel.style.display = "none";
+    toggleStatsPanel();
   });
 
-  // ✅ INVENTORY BUTTON EVENT
   UI.invBtn?.addEventListener("click", () => {
     UI.menuDropdown?.classList.remove("open");
-    const show = UI.invPanel.style.display !== "block";
-    UI.invPanel.style.display = show ? "block" : "none";
-    if (show) {
-      UI.statsPanel.style.display = "none";
-      updateInvPanelText();
-    }
+    toggleInvPanel();
   });
 
-  // ✅ Claim quest reward by clicking the quest progress text
+  UI.questBtn?.addEventListener("click", () => {
+    UI.menuDropdown?.classList.remove("open");
+    toggleQuestPanel();
+  });
+
+  // Close buttons for panels
+  UI.statsClose?.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setStatsOpen(false);
+  });
+  UI.invClose?.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setInvOpen(false);
+  });
+
+  UI.questClose?.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setQuestOpen(false);
+  });
+
+  function makePanelDraggable(panelEl) {
+    if (!panelEl) return;
+
+    panelEl.addEventListener("pointerdown", (e) => {
+      // Allow dragging only from empty area / headers; don't interfere with buttons.
+      if (e.button !== 0) return;
+      const t = e.target;
+      if (t && t.closest && t.closest("button, input, textarea, select, a")) return;
+      if (panelEl === UI.questPanel && t && t.closest && t.closest("#questProgress")) return;
+      if (panelEl.style.display === "none") return;
+
+      e.preventDefault();
+
+      const rect = panelEl.getBoundingClientRect();
+      const startX = e.clientX;
+      const startY = e.clientY;
+      const offsetX = startX - rect.left;
+      const offsetY = startY - rect.top;
+
+      const prevZ = panelEl.style.zIndex;
+      panelEl.style.zIndex = "9999";
+      panelEl.style.right = "auto";
+      panelEl.style.left = `${rect.left}px`;
+      panelEl.style.top = `${rect.top}px`;
+
+      const onMove = (ev) => {
+        const w = rect.width;
+        const h = rect.height;
+        const rawLeft = ev.clientX - offsetX;
+        const rawTop = ev.clientY - offsetY;
+        const left = clamp(rawLeft, 0, window.innerWidth - w);
+        const top = clamp(rawTop, 0, window.innerHeight - h);
+        panelEl.style.left = `${left}px`;
+        panelEl.style.top = `${top}px`;
+      };
+
+      const onUp = () => {
+        panelEl.style.zIndex = prevZ || "";
+        document.removeEventListener("pointermove", onMove);
+      };
+
+      document.addEventListener("pointermove", onMove);
+      document.addEventListener("pointerup", onUp, { once: true });
+    });
+  }
+
+  // Quest / Stats / Inventory can be dragged anywhere.
+  makePanelDraggable(UI.questPanel);
+  makePanelDraggable(UI.statsPanel);
+  makePanelDraggable(UI.invPanel);
+
+  // ===== CHAT UI =====
+  if (UI.chatPanel) {
+    // Start collapsed; user can press C or expand the panel.
+    setChatExpanded(false);
+    if (UI.chatMessages) UI.chatMessages.innerHTML = "";
+  }
+
+  UI.chatHeader?.addEventListener("click", () => {
+    setChatExpanded(!chatExpanded);
+  });
+
+  UI.chatExpandBtn?.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setChatExpanded(!chatExpanded);
+  });
+
+  UI.chatSendBtn?.addEventListener("click", (e) => {
+    e.preventDefault();
+    sendChatMessage();
+  });
+
+  const chatPanelEl = UI.chatPanel;
+  if (chatPanelEl && window.ResizeObserver) {
+    let resizeSaveT = 0;
+    new ResizeObserver(() => {
+      if (chatPanelEl.classList.contains("collapsed")) return;
+      clearTimeout(resizeSaveT);
+      resizeSaveT = setTimeout(() => {
+        try {
+          localStorage.setItem("chatPanelW", String(chatPanelEl.offsetWidth));
+          localStorage.setItem("chatPanelH", String(chatPanelEl.offsetHeight));
+        } catch (_) {}
+      }, 150);
+    }).observe(chatPanelEl);
+  }
+  try {
+    const rw = localStorage.getItem("chatPanelW");
+    const rh = localStorage.getItem("chatPanelH");
+    if (chatPanelEl && rw && rh) {
+      const w = parseInt(rw, 10);
+      const h = parseInt(rh, 10);
+      if (w >= 280 && h >= 120) {
+        chatPanelEl.style.width = `${w}px`;
+        chatPanelEl.style.height = `${h}px`;
+      }
+    }
+  } catch (_) {}
+
+  // Custom resize handle (more reliable than CSS `resize`).
+  const chatResizeHandle = document.getElementById("chatResizeHandle");
+  if (chatPanelEl && chatResizeHandle) {
+    chatResizeHandle.addEventListener("pointerdown", (e) => {
+      if (chatPanelEl.classList.contains("collapsed")) return;
+      e.preventDefault();
+      e.stopPropagation();
+
+      const startRect = chatPanelEl.getBoundingClientRect();
+      const startX = e.clientX;
+      const startY = e.clientY;
+      const startW = startRect.width;
+      const startH = startRect.height;
+
+      const minW = 280;
+      const minH = 120;
+      const cs = window.getComputedStyle(chatPanelEl);
+      const leftMargin = parseFloat(cs.left) || startRect.left || 10;
+      const bottomMargin = parseFloat(cs.bottom) || 10;
+      // Panel is `position: fixed` with `left` + `bottom`, so increasing height should
+      // be bounded by the viewport minus the bottom margin (not the initial top).
+      const maxW = Math.max(minW, window.innerWidth - leftMargin - 10);
+      const maxH = Math.max(minH, window.innerHeight - bottomMargin - 10);
+
+      const onMove = (ev) => {
+        const dw = ev.clientX - startX;
+        const dh = ev.clientY - startY;
+        const nextW = clamp(startW + dw, minW, maxW);
+        const nextH = clamp(startH + dh, minH, maxH);
+        chatPanelEl.style.width = `${nextW}px`;
+        chatPanelEl.style.height = `${nextH}px`;
+      };
+
+      const onUp = () => {
+        document.removeEventListener("pointermove", onMove);
+      };
+
+      document.addEventListener("pointermove", onMove);
+      document.addEventListener("pointerup", onUp, { once: true });
+    });
+  }
+
+  UI.chatInput?.addEventListener("keydown", (e) => {
+    const isEnter = e.key === "Enter" || e.code === "NumpadEnter";
+    if (isEnter) {
+      e.preventDefault();
+      const raw = UI.chatInput.value.trim();
+      if (raw) sendChatMessage();
+      else setChatExpanded(false);
+      return;
+    }
+    if (e.key === "Escape") {
+      e.preventDefault();
+      setChatExpanded(false);
+    }
+  });
 
   let claimingQuest = false;
 
@@ -2176,7 +2836,7 @@ async function boot() {
     respawnPlayer();
   });
 
-  UI.hud?.addEventListener("click", async () => {
+  UI.questPanel?.addEventListener("click", async () => {
     if (!questReadyToClaim) return;
     if (!questState?.activeQuest) return;
     if (claimingQuest) return;
@@ -2221,8 +2881,9 @@ async function boot() {
     if (UI.loginScreen) UI.loginScreen.style.display = "flex";
     if (UI.hud) UI.hud.style.display = "none";
     if (UI.gameMenu) UI.gameMenu.style.display = "none";
-    if (UI.statsPanel) UI.statsPanel.style.display = "none";
-    if (UI.invPanel) UI.invPanel.style.display = "none";
+    setStatsOpen(false);
+    setInvOpen(false);
+    setQuestOpen(false);
   }
 
   async function doLogin(token, username) {
@@ -2232,6 +2893,7 @@ async function boot() {
     localStorage.setItem("maple_user", username);
 
     showGameUI();
+    ensureBgmStarted();
 
     // Load saved game data from server
     const gd = await loadGameFromServer();
